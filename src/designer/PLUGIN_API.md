@@ -4,7 +4,13 @@
 **Status:** Active & Stable  
 **Last Updated:** January 8, 2026
 
-Tujuan dokumen ini: Menjelaskan fondasi internal API yang **stabil** dan **pluggable** untuk memudahkan pengembangan fitur dan plugin tanpa refactor besar-besaran.
+Tujuan dokumen ini: Ringkasan cepat tentang komponen plugin (Engine/API/Registry/Elements).
+
+Dokumentasi plugin yang lebih akurat + tutorial step-by-step ada di:
+
+- `src/designer/plugins/README.md`
+
+> Catatan: file ini sebelumnya berisi beberapa contoh yang tidak sesuai dengan arsitektur yang berjalan (mis. menyuruh edit `PropertiesPanel.tsx` untuk setiap custom element). Sekarang praktik yang direkomendasikan adalah menambah UI lewat `DesignerRegistry` (properties section / ribbon action) dan menambah element lewat `ElementRegistry`.
 
 ## 🎯 Arsitektur Overview
 
@@ -37,7 +43,7 @@ Di dalam komponen React, gunakan hook `useDesignerHost()` untuk mengakses semua 
 import { useDesignerHost } from "../hooks/useDesignerHost";
 
 function MyComponent() {
-  const { engine, api, registry, plugins, elements } = useDesignerHost();
+  const { api } = useDesignerHost();
 
   // Contoh penggunaan
   const handleClick = () => {
@@ -253,10 +259,11 @@ export const MyPlugin: DesignerPlugin = {
 ### Plugin Registration
 
 ```typescript
-// Di aplikasi utama (DesignerApp.tsx)
-import { MyPlugin } from "./plugins/MyPlugin";
+// Di aplikasi utama (DesignerApp.tsx): host membuat PluginManager,
+// tapi plugin TIDAK auto-aktif. Kamu harus register + activate.
 
-const host = createDesignerHost();
+host.plugins.register(MyPlugin);
+host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements });
 
 // Register plugin
 host.plugins.register(MyPlugin);
@@ -368,51 +375,13 @@ return disposeElement;
 
 ### Element Properties Integration
 
-Untuk menampilkan properties custom di Properties Panel:
+Untuk menampilkan UI properties custom, **jangan edit core** `PropertiesPanel.tsx` untuk setiap element.
+Cara yang dianjurkan:
 
-```typescript
-// Di PropertiesPanel.tsx, tambahkan case untuk custom element
-if (el.type === "custom") {
-  const c = el as CustomElement;
+- Tambahkan section lewat `registry.registerPropertiesSection(...)`
+- Di dalam section itu, cek selection saat ini, lalu render control untuk element yang kamu target
 
-  if (c.kind === "myElement") {
-    return (
-      <div className="grid grid-cols-2 gap-2 items-center">
-        {/* Basic properties */}
-        <Row id={`${baseId}-x`} label="X" control={numberInput(`${baseId}-x`, c.x, (v) => engine.updateElement(el.id, { x: v }))} />
-        <Row id={`${baseId}-y`} label="Y" control={numberInput(`${baseId}-y`, c.y, (v) => engine.updateElement(el.id, { y: v }))} />
-        <Row id={`${baseId}-w`} label="Width" control={numberInput(`${baseId}-w`, c.width, (v) => engine.updateElement(el.id, { width: Math.max(1, v) }))} />
-        <Row id={`${baseId}-h`} label="Height" control={numberInput(`${baseId}-h`, c.height, (v) => engine.updateElement(el.id, { height: Math.max(1, v) }))} />
-
-        {/* Custom properties */}
-        <Row
-          id={`${baseId}-custom-value`}
-          label="Custom Value"
-          control={numberInput(`${baseId}-custom-value`, c.props.customValue, (v) => {
-            const newProps = { ...c.props, customValue: v };
-            engine.updateElement(el.id, { props: newProps });
-          })}
-        />
-
-        <Row
-          id={`${baseId}-custom-text`}
-          label="Custom Text"
-          control={textInput(`${baseId}-custom-text`, c.props.customText, (v) => {
-            const newProps = { ...c.props, customText: v };
-            engine.updateElement(el.id, { props: newProps });
-          })}
-        />
-
-        {/* Event listeners dan MQTT */}
-        {common}
-      </div>
-    );
-  }
-
-  // Generic custom element handling
-  // ... existing code
-}
-```
+Contohnya bisa lihat di `DesignerApp.tsx` yang mendaftarkan section untuk Numeric Display.
 
 ## 📡 MQTT Event System
 
