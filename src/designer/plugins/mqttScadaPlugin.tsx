@@ -21,10 +21,15 @@ type MqttScadaSettings = {
   // Remote control
   remoteControlEnabled?: boolean;
   remoteControlTopic?: string;
+  remoteControlResponseTopic?: string;
 
   // Event output
   eventOutputEnabled?: boolean;
   defaultEventTopic?: string; // used when caller publishes to "default/events"
+
+  // Force publish UI events even if per-element flags are not enabled.
+  forcePublishElementEvents?: boolean;
+  forcePublishCanvasEvents?: boolean;
 };
 
 const PLUGIN_ID = "system.mqttScada";
@@ -42,8 +47,12 @@ function coerceSettings(value: unknown): MqttScadaSettings {
     reconnectPeriodMs: Number.isFinite(v.reconnectPeriodMs) ? Number(v.reconnectPeriodMs) : 2000,
     remoteControlEnabled: typeof v.remoteControlEnabled === "boolean" ? v.remoteControlEnabled : true,
     remoteControlTopic: typeof v.remoteControlTopic === "string" ? v.remoteControlTopic : "scada/rc",
+    remoteControlResponseTopic: typeof v.remoteControlResponseTopic === "string" ? v.remoteControlResponseTopic : "scada/rc/resp",
     eventOutputEnabled: typeof v.eventOutputEnabled === "boolean" ? v.eventOutputEnabled : true,
     defaultEventTopic: typeof v.defaultEventTopic === "string" ? v.defaultEventTopic : "scada/events",
+
+    forcePublishElementEvents: typeof v.forcePublishElementEvents === "boolean" ? v.forcePublishElementEvents : false,
+    forcePublishCanvasEvents: typeof v.forcePublishCanvasEvents === "boolean" ? v.forcePublishCanvasEvents : false,
   };
 }
 
@@ -63,11 +72,12 @@ function publishJson(client: MqttClient, topic: string, payload: unknown) {
   client.publish(topic, JSON.stringify(payload));
 }
 
-function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown) {
+function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown, publishResponse?: (payload: unknown) => void) {
   if (!cmd || typeof cmd !== "object") return;
   const o = cmd as Record<string, unknown>;
   const action = String(o.action ?? "");
   const payload = (o.payload ?? {}) as Record<string, unknown>;
+  const requestId = typeof o.requestId === "string" ? o.requestId : undefined;
 
   if (action === "select") {
     const ids = Array.isArray(payload.ids) ? (payload.ids.filter((x) => typeof x === "string") as string[]) : [];
@@ -109,6 +119,41 @@ function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown) {
     return;
   }
 
+  if (action === "exportProjectJson") {
+    const json = api.exportProjectJson();
+    publishResponse?.({
+      type: "exportProjectJson",
+      requestId,
+      ok: true,
+      json,
+    });
+    return;
+  }
+
+  if (action === "importProjectJson") {
+    const jsonText = typeof payload.jsonText === "string" ? payload.jsonText : null;
+    const docObj = payload.doc;
+    try {
+      if (jsonText && jsonText.trim()) {
+        api.importProjectJson(jsonText);
+      } else if (docObj && typeof docObj === "object") {
+        api.importProjectJson(JSON.stringify(docObj));
+      } else {
+        throw new Error("jsonText or doc is required");
+      }
+      publishResponse?.({ type: "importProjectJson", requestId, ok: true });
+    } catch (err) {
+      publishResponse?.({ type: "importProjectJson", requestId, ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  if (action === "deleteAllElements") {
+    const doc = api.getDocument();
+    api.deleteElements([...doc.rootIds]);
+    return;
+  }
+
   if (action === "createElement") {
     const input = payload.input as unknown;
     if (input && typeof input === "object") {
@@ -121,6 +166,27 @@ function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown) {
     const id = String(payload.id ?? "");
     const patch = payload.patch as unknown;
     if (id && patch && typeof patch === "object") api.updateElement(id, patch as Partial<DesignerElement>);
+    return;
+  }
+
+  if (action === "updateCustomProps") {
+    const id = String(payload.id ?? "");
+    const patch = payload.patch;
+    if (id && patch && typeof patch === "object") api.updateCustomProps(id, patch as Record<string, unknown>);
+    return;
+  }
+
+  if (action === "callElementAction") {
+    const id = String(payload.id ?? "");
+    const actionId = String(payload.actionId ?? "");
+    const args = Array.isArray(payload.args) ? payload.args : [];
+    if (!id || !actionId) return;
+    try {
+      const result = api.callElementAction(id, actionId, ...args);
+      publishResponse?.({ type: "callElementAction", requestId, ok: true, result });
+    } catch (err) {
+      publishResponse?.({ type: "callElementAction", requestId, ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
     return;
   }
 
@@ -204,6 +270,14 @@ function createConnectionManager(api: DesignerAPI) {
 
       client = mqtt.connect(url, opts);
 
+      const publishResponse = (payload: unknown) => {
+        const s = coerceSettings(api.getPluginSettings(PLUGIN_ID));
+        const topic = s.remoteControlResponseTopic?.trim();
+        if (!topic) return;
+        if (!client) return;
+        publishJson(client, topic, payload);
+      };
+
       client.on("message", (topic, payload) => {
         const s = coerceSettings(api.getPluginSettings(PLUGIN_ID));
         if (!s.remoteControlEnabled) return;
@@ -212,7 +286,7 @@ function createConnectionManager(api: DesignerAPI) {
 
         const text = payload.toString("utf8");
         const parsed = jsonSafeParse(text);
-        applyRemoteControlCommand(api, parsed);
+        applyRemoteControlCommand(api, parsed, publishResponse);
       });
 
       client.on("connect", () => {
@@ -404,6 +478,15 @@ function SettingsDialog({ api }: { api: DesignerAPI }) {
             placeholder="scada/rc"
           />
         </label>
+        <label className="space-y-1 block">
+          <div className="text-xs font-medium">Response topic (optional)</div>
+          <input
+            className="w-full px-2 py-1.5 rounded border border-black/15"
+            value={settings.remoteControlResponseTopic ?? ""}
+            onChange={(e) => setSettings((s) => ({ ...s, remoteControlResponseTopic: e.target.value }))}
+            placeholder="scada/rc/resp"
+          />
+        </label>
         <div className="text-xs text-black/60">
           Message format: <span className="font-mono">{"{"}action, payload{"}"}</span>
         </div>
@@ -431,6 +514,24 @@ function SettingsDialog({ api }: { api: DesignerAPI }) {
         <div className="text-xs text-black/60">
           Elements can override per element via <span className="font-mono">mqttTopic</span>.
         </div>
+
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={settings.forcePublishElementEvents ?? false}
+            onChange={(e) => setSettings((s) => ({ ...s, forcePublishElementEvents: e.target.checked }))}
+          />
+          <span className="text-xs">Force publish element events (ignore per-element flags)</span>
+        </label>
+
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={settings.forcePublishCanvasEvents ?? false}
+            onChange={(e) => setSettings((s) => ({ ...s, forcePublishCanvasEvents: e.target.checked }))}
+          />
+          <span className="text-xs">Force publish canvas events</span>
+        </label>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

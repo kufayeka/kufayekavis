@@ -22,10 +22,24 @@ export function RenderTree({
     .filter(Boolean)
     .sort((a, b) => (a!.zIndex ?? 0) - (b!.zIndex ?? 0)) as DesignerElement[];
 
+  const mqtt = api.getPluginSettings("system.mqttScada") as unknown;
+  const forcePublishElementEvents =
+    mqtt && typeof mqtt === "object" && "forcePublishElementEvents" in (mqtt as Record<string, unknown>)
+      ? Boolean((mqtt as Record<string, unknown>).forcePublishElementEvents)
+      : false;
+
   return (
     <>
       {sorted.map((el) => (
-        <RenderElement key={el.id} el={el} doc={doc} onRegister={onRegister} renderCustom={renderCustom} api={api} />
+        <RenderElement
+          key={el.id}
+          el={el}
+          doc={doc}
+          onRegister={onRegister}
+          renderCustom={renderCustom}
+          api={api}
+          forcePublishElementEvents={forcePublishElementEvents}
+        />
       ))}
     </>
   );
@@ -37,12 +51,14 @@ function RenderElement({
   onRegister,
   renderCustom,
   api,
+  forcePublishElementEvents,
 }: {
   el: DesignerElement;
   doc: DesignerState["doc"];
   onRegister: (id: ElementId, node: SVGElement | null) => void;
   renderCustom: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
   api: DesignerAPI;
+  forcePublishElementEvents: boolean;
 }) {
   if (el.hidden) return null;
 
@@ -67,7 +83,15 @@ function RenderElement({
     return (
       <g ref={(node) => onRegister(el.id, node)} data-el-id={el.id}>
         {children.map((child) => (
-          <RenderElement key={child.id} el={child} doc={doc} onRegister={onRegister} renderCustom={renderCustom} api={api} />
+          <RenderElement
+            key={child.id}
+            el={child}
+            doc={doc}
+            onRegister={onRegister}
+            renderCustom={renderCustom}
+            api={api}
+            forcePublishElementEvents={forcePublishElementEvents}
+          />
         ))}
       </g>
     );
@@ -95,17 +119,17 @@ function RenderElement({
         transform={getTransform(cx, cy)}
         className="cursor-move"
         onMouseEnter={
-          el.enableOnMouseHoverEventListener
+          forcePublishElementEvents || el.enableOnMouseHoverEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
             : undefined
         }
         onClick={
-          el.enableOnMouseClickEventListener
+          forcePublishElementEvents || el.enableOnMouseClickEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
             : undefined
         }
         onMouseLeave={
-          el.enableOnMouseLeaveEventListener
+          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
             : undefined
         }
@@ -127,17 +151,17 @@ function RenderElement({
         opacity={opacity}
         className="cursor-move"
         onMouseEnter={
-          el.enableOnMouseHoverEventListener
+          forcePublishElementEvents || el.enableOnMouseHoverEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
             : undefined
         }
         onClick={
-          el.enableOnMouseClickEventListener
+          forcePublishElementEvents || el.enableOnMouseClickEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
             : undefined
         }
         onMouseLeave={
-          el.enableOnMouseLeaveEventListener
+          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
             : undefined
         }
@@ -162,17 +186,17 @@ function RenderElement({
         transform={getTransform(cx, cy)}
         className="cursor-move"
         onMouseEnter={
-          el.enableOnMouseHoverEventListener
+          forcePublishElementEvents || el.enableOnMouseHoverEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
             : undefined
         }
         onClick={
-          el.enableOnMouseClickEventListener
+          forcePublishElementEvents || el.enableOnMouseClickEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
             : undefined
         }
         onMouseLeave={
-          el.enableOnMouseLeaveEventListener
+          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
             : undefined
         }
@@ -192,17 +216,17 @@ function RenderElement({
         opacity={opacity}
         className="cursor-move"
         onMouseEnter={
-          el.enableOnMouseHoverEventListener
+          forcePublishElementEvents || el.enableOnMouseHoverEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
             : undefined
         }
         onClick={
-          el.enableOnMouseClickEventListener
+          forcePublishElementEvents || el.enableOnMouseClickEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
             : undefined
         }
         onMouseLeave={
-          el.enableOnMouseLeaveEventListener
+          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
             : undefined
         }
@@ -230,17 +254,17 @@ function RenderElement({
         className="cursor-move"
         role="img"
         onMouseEnter={
-          el.enableOnMouseHoverEventListener
+          forcePublishElementEvents || el.enableOnMouseHoverEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
             : undefined
         }
         onClick={
-          el.enableOnMouseClickEventListener
+          forcePublishElementEvents || el.enableOnMouseClickEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
             : undefined
         }
         onMouseLeave={
-          el.enableOnMouseLeaveEventListener
+          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
             : undefined
         }
@@ -280,17 +304,17 @@ function RenderElement({
         transform={transform}
         className="cursor-move"
         onMouseEnter={
-          el.enableOnMouseHoverEventListener
+          forcePublishElementEvents || el.enableOnMouseHoverEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
             : undefined
         }
         onClick={
-          el.enableOnMouseClickEventListener
+          forcePublishElementEvents || el.enableOnMouseClickEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
             : undefined
         }
         onMouseLeave={
-          el.enableOnMouseLeaveEventListener
+          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
             : undefined
         }
@@ -314,17 +338,17 @@ function RenderElement({
         transform={transform}
         className="cursor-move"
         onMouseEnter={
-          el.enableOnMouseHoverEventListener
+          forcePublishElementEvents || el.enableOnMouseHoverEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
             : undefined
         }
         onClick={
-          el.enableOnMouseClickEventListener
+          forcePublishElementEvents || el.enableOnMouseClickEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
             : undefined
         }
         onMouseLeave={
-          el.enableOnMouseLeaveEventListener
+          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
             ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
             : undefined
         }

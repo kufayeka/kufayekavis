@@ -197,6 +197,8 @@ activate: ({ api, registry, elements }) => {
 
 Plugin bawaan: `system.mqttScada` (file: `src/designer/plugins/mqttScadaPlugin.tsx`).
 
+Dokumentasi lengkap (parameter, topics, command schema, contoh): lihat `src/designer/plugins/SCADA_MQTT.md`.
+
 Fungsi:
 - **UI remote control interface**: subscribe topic MQTT (WebSocket) dan menjalankan command untuk canvas/element lewat `DesignerAPI`.
 - **UI event output interface**: publish event onClick/onHover/onLeave dari element (dan event basic dari canvas) ke topic MQTT.

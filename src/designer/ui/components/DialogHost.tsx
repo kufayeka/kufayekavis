@@ -31,13 +31,13 @@ export function DialogHost({ engine, state }: { engine: DesignerEngine; state: D
   if (!open || !def) return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/20 h-full w-full"
+        className="fixed inset-0 bg-black/20"
         onMouseDown={() => host.registry.closeDialog()}
       />
-      <div className="relative w-[min(720px,90vw)] max-h-[80vh] bg-white rounded border border-black/15 shadow-sm overflow-hidden">
-        <div className="px-3 py-2 border-b border-black/10 flex items-center justify-between">
+      <div className="relative w-[min(720px,95vw)] max-w-[720px] h-[min(80vh,640px)] max-h-[80vh] bg-white rounded border border-black/15 shadow-sm overflow-hidden flex flex-col">
+        <div className="px-3 py-2 border-b border-black/10 flex items-center justify-between shrink-0">
           <div className="font-medium text-sm">{def.title}</div>
           <button
             className="px-2 py-1 rounded border border-black/15 hover:bg-black/5 text-sm"
@@ -46,7 +46,7 @@ export function DialogHost({ engine, state }: { engine: DesignerEngine; state: D
             Close
           </button>
         </div>
-        <div className="p-3 overflow-auto">{def.render(ctx) as React.ReactNode}</div>
+        <div className="p-3 flex-1 min-h-0 overflow-x-auto overflow-y-auto">{def.render(ctx) as React.ReactNode}</div>
       </div>
     </div>
   );
