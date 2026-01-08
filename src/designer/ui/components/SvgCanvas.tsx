@@ -2,82 +2,17 @@
 
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { gsap } from "gsap";
 import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { DesignerElement, ElementId } from "../../core/types";
-import type { DesignerAPI } from "../../core/api";
-import { getBBoxCenter, getElementBBox, getSelectionBBox } from "../../core/geometry";
+import { getElementBBox, getSelectionBBox } from "../../core/geometry";
 import { clamp } from "../../core/math";
 import { translateElement } from "../../core/transform";
 import { useDesignerHost } from "../hooks/useDesignerHost";
 
-async function loadImageSize(href: string): Promise<{ naturalWidth?: number; naturalHeight?: number }> {
-  return await new Promise((resolve) => {
-    try {
-      const img = new Image();
-      img.onload = () => resolve({ naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
-      img.onerror = () => resolve({});
-      img.src = href;
-      // Some browsers won't fire onload for data URLs that are empty; guard with timeout
-      setTimeout(() => {
-        resolve({ naturalWidth: img.naturalWidth || undefined, naturalHeight: img.naturalHeight || undefined });
-      }, 500);
-    } catch {
-      resolve({});
-    }
-  });
-}
-
-type DragMode =
-  | { kind: "none" }
-  | {
-      kind: "move";
-      startX: number;
-      startY: number;
-      originX: number;
-      originY: number;
-      ids: ElementId[];
-      startElements: Record<ElementId, DesignerElement>;
-      startBox: { x: number; y: number; width: number; height: number } | null;
-    }
-  | {
-      kind: "marquee";
-      startX: number;
-      startY: number;
-      x: number;
-      y: number;
-      append: boolean;
-    }
-  | {
-      kind: "resize-rect";
-      id: ElementId;
-      handle: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
-      startX: number;
-      startY: number;
-      start: { x: number; y: number; w: number; h: number };
-      startRotation: number;
-    }
-  | {
-      kind: "resize-text";
-      id: ElementId;
-      handle: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
-      startX: number;
-      startY: number;
-      startFontSize: number;
-      startRotation: number;
-    }
-  | { kind: "rotate"; id: ElementId; startAngle: number; startRotation: number; center: { x: number; y: number } }
-  | { kind: "line-end"; id: ElementId; end: "p1" | "p2" }
-  | { kind: "circle-r"; id: ElementId }
-  | { kind: "free"; points: Array<{ x: number; y: number }> };
-
-function rotateDelta(dx: number, dy: number, degrees: number): { dx: number; dy: number } {
-  if (!degrees) return { dx, dy };
-  const rad = (degrees * Math.PI) / 180;
-  const c = Math.cos(rad);
-  const s = Math.sin(rad);
-  return { dx: dx * c - dy * s, dy: dx * s + dy * c };
-}
+import type { DragMode } from "./svgCanvas/dragTypes";
+import { MagnifierOverlay, SelectionOverlay } from "./svgCanvas/overlays";
+import { RenderTree } from "./svgCanvas/renderTree";
+import { fileToDataUrl, loadImageSize, pointsToPath, rotateDelta } from "./svgCanvas/utils";
 
 export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: DesignerState }) {
   const host = useDesignerHost();
@@ -115,7 +50,15 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       const h = Math.max(1, el.height);
       return (
         <>
-          <rect x={0} y={0} width={w} height={h} fill={el.fill || "transparent"} stroke={el.stroke || "var(--foreground)"} strokeWidth={el.strokeWidth ?? 2} />
+          <rect
+            x={0}
+            y={0}
+            width={w}
+            height={h}
+            fill={el.fill || "transparent"}
+            stroke={el.stroke || "var(--foreground)"}
+            strokeWidth={el.strokeWidth ?? 2}
+          />
           <text x={8} y={20} fontSize={14} fill={el.stroke || "var(--foreground)"} opacity={0.85}>
             {label}
           </text>
@@ -129,17 +72,20 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
   const svgHeight = state.doc.canvas.height * state.zoom.scale;
   const viewBox = `0 0 ${state.doc.canvas.width} ${state.doc.canvas.height}`;
 
-  const clientToCanvas = useCallback((clientX: number, clientY: number) => {
-    const svg = svgRef.current;
-    if (!svg) return { x: 0, y: 0 };
-    const rect = svg.getBoundingClientRect();
-    // Map client pixels into SVG viewBox units (canvas coordinates)
-    const scaleX = state.doc.canvas.width / rect.width;
-    const scaleY = state.doc.canvas.height / rect.height;
-    const x = (clientX - rect.left) * scaleX;
-    const y = (clientY - rect.top) * scaleY;
-    return { x, y };
-  }, [state.doc.canvas.height, state.doc.canvas.width]);
+  const clientToCanvas = useCallback(
+    (clientX: number, clientY: number) => {
+      const svg = svgRef.current;
+      if (!svg) return { x: 0, y: 0 };
+      const rect = svg.getBoundingClientRect();
+      // Map client pixels into SVG viewBox units (canvas coordinates)
+      const scaleX = state.doc.canvas.width / rect.width;
+      const scaleY = state.doc.canvas.height / rect.height;
+      const x = (clientX - rect.left) * scaleX;
+      const y = (clientY - rect.top) * scaleY;
+      return { x, y };
+    },
+    [state.doc.canvas.height, state.doc.canvas.width],
+  );
 
   const snapIfEnabled = useCallback(
     (x: number, y: number) => {
@@ -247,6 +193,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
         const rawDx = p.x - drag.startX;
         const rawDy = p.y - drag.startY;
         const { dx, dy } = rotateDelta(rawDx, rawDy, -drag.startRotation);
+
         let x = drag.start.x;
         let y = drag.start.y;
         let w = drag.start.w;
@@ -273,7 +220,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
 
         engine.updateElement(drag.id, { x, y, width: w, height: h });
         return;
-      } 
+      }
 
       if (drag.kind === "resize-text") {
         const p = clientToCanvas(e.clientX, e.clientY);
@@ -327,10 +274,12 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
 
     const onPointerUp = () => {
       const drag = dragRef.current;
+
       if (drag.kind === "free") {
         const d = pointsToPath(drag.points);
         if (d) engine.createElement({ type: "free", d });
       }
+
       if (
         drag.kind === "move" ||
         drag.kind === "resize-rect" ||
@@ -341,49 +290,51 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       ) {
         engine.endHistoryBatch();
       }
-        if (drag.kind === "marquee") {
-          const tool = engine.getState().tool;
-          const startX = drag.startX;
-          const startY = drag.startY;
-          const endX = drag.x;
-          const endY = drag.y;
-          if (tool === "magnifier") {
-            // compute box in canvas units
-            const x1 = Math.min(startX, endX);
-            const y1 = Math.min(startY, endY);
-            const x2 = Math.max(startX, endX);
-            const y2 = Math.max(startY, endY);
-            const box = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
 
-            const scroller = scrollRef.current;
-            const svg = svgRef.current;
-            if (scroller && svg && box.width > 0 && box.height > 0) {
-              const containerRect = scroller.getBoundingClientRect();
-              const oldScale = engine.getState().zoom.scale;
-              const suggested = Math.min(
-                containerRect.width / Math.max(1, box.width),
-                containerRect.height / Math.max(1, box.height),
-              );
+      if (drag.kind === "marquee") {
+        const tool = engine.getState().tool;
+        const startX = drag.startX;
+        const startY = drag.startY;
+        const endX = drag.x;
+        const endY = drag.y;
+        if (tool === "magnifier") {
+          // compute box in canvas units
+          const x1 = Math.min(startX, endX);
+          const y1 = Math.min(startY, endY);
+          const x2 = Math.max(startX, endX);
+          const y2 = Math.max(startY, endY);
+          const box = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
 
-              // compute overlay position (center of selection in client coords)
-              const centerX = box.x + box.width / 2;
-              const centerY = box.y + box.height / 2;
-              const centerClientX = containerRect.left + centerX * oldScale - scroller.scrollLeft;
-              const centerClientY = containerRect.top + centerY * oldScale - scroller.scrollTop;
+          const scroller = scrollRef.current;
+          const svg = svgRef.current;
+          if (scroller && svg && box.width > 0 && box.height > 0) {
+            const containerRect = scroller.getBoundingClientRect();
+            const oldScale = engine.getState().zoom.scale;
+            const suggested = Math.min(
+              containerRect.width / Math.max(1, box.width),
+              containerRect.height / Math.max(1, box.height),
+            );
 
-              // position relative to scroller
-              const left = centerClientX - containerRect.left;
-              const top = centerClientY - containerRect.top;
+            // compute overlay position (center of selection in client coords)
+            const centerX = box.x + box.width / 2;
+            const centerY = box.y + box.height / 2;
+            const centerClientX = containerRect.left + centerX * oldScale - scroller.scrollLeft;
+            const centerClientY = containerRect.top + centerY * oldScale - scroller.scrollTop;
 
-              setPendingMagnifier({ box, suggestedScale: suggested, left, top });
-            } else {
-              // fallback: just select
-              finalizeMarqueeSelection(startX, startY, endX, endY, drag.append);
-            }
+            // position relative to scroller
+            const left = centerClientX - containerRect.left;
+            const top = centerClientY - containerRect.top;
+
+            setPendingMagnifier({ box, suggestedScale: suggested, left, top });
           } else {
-            finalizeMarqueeSelection(drag.startX, drag.startY, drag.x, drag.y, drag.append);
+            // fallback: just select
+            finalizeMarqueeSelection(startX, startY, endX, endY, drag.append);
           }
+        } else {
+          finalizeMarqueeSelection(drag.startX, drag.startY, drag.x, drag.y, drag.append);
         }
+      }
+
       dragRef.current = { kind: "none" };
       setDragUi({ kind: "none" });
     };
@@ -481,6 +432,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       setDragUi({ kind: "none" });
       return;
     }
+
     // If any of the selected elements are locked, allow selection but don't start move
     const anyLocked = selectedIds.some((sid) => engine.getState().doc.elements[sid]?.locked);
     if (anyLocked) {
@@ -533,7 +485,10 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
         if (!file.type.startsWith("image/") && !file.name.toLowerCase().endsWith(".svg")) continue;
         const href = await fileToDataUrl(file);
         // try to get natural size
-        const { naturalWidth, naturalHeight } = await loadImageSize(href).catch(() => ({ naturalWidth: undefined, naturalHeight: undefined }));
+        const { naturalWidth, naturalHeight } = await loadImageSize(href).catch(() => ({
+          naturalWidth: undefined,
+          naturalHeight: undefined,
+        }));
         const w = naturalWidth && naturalWidth > 0 ? naturalWidth : undefined;
         const h = naturalHeight && naturalHeight > 0 ? naturalHeight : undefined;
         engine.createElement({ type: "image", x: p.x, y: p.y, href, width: w, height: h, naturalWidth, naturalHeight });
@@ -549,13 +504,19 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
     if (textual) {
       if (/^data:image\//i.test(textual) || /^https?:\/\/.+\.(png|jpe?g|svg)$/i.test(textual)) {
         const href = textual;
-        const { naturalWidth, naturalHeight } = await loadImageSize(href).catch(() => ({ naturalWidth: undefined, naturalHeight: undefined }));
+        const { naturalWidth, naturalHeight } = await loadImageSize(href).catch(() => ({
+          naturalWidth: undefined,
+          naturalHeight: undefined,
+        }));
         engine.createElement({ type: "image", x: p.x, y: p.y, href, width: naturalWidth, height: naturalHeight, naturalWidth, naturalHeight });
         return;
       }
       if (textual.startsWith("<svg")) {
         const href = "data:image/svg+xml;utf8," + encodeURIComponent(textual);
-        const { naturalWidth, naturalHeight } = await loadImageSize(href).catch(() => ({ naturalWidth: undefined, naturalHeight: undefined }));
+        const { naturalWidth, naturalHeight } = await loadImageSize(href).catch(() => ({
+          naturalWidth: undefined,
+          naturalHeight: undefined,
+        }));
         engine.createElement({ type: "image", x: p.x, y: p.y, href, width: naturalWidth, height: naturalHeight, naturalWidth, naturalHeight });
         return;
       }
@@ -714,18 +675,19 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
           onWheel={onWheel}
         >
           <defs>
-            <pattern
-              id={gridPatternId}
-              width={state.doc.canvas.gridSize}
-              height={state.doc.canvas.gridSize}
-              patternUnits="userSpaceOnUse"
-            >
-              <path d={`M ${state.doc.canvas.gridSize} 0 L 0 0 0 ${state.doc.canvas.gridSize}`} fill="none" stroke="black" opacity="0.12" strokeWidth="1" />
+            <pattern id={gridPatternId} width={state.doc.canvas.gridSize} height={state.doc.canvas.gridSize} patternUnits="userSpaceOnUse">
+              <path
+                d={`M ${state.doc.canvas.gridSize} 0 L 0 0 0 ${state.doc.canvas.gridSize}`}
+                fill="none"
+                stroke="black"
+                opacity="0.12"
+                strokeWidth="1"
+              />
             </pattern>
           </defs>
           <g>
             <rect x={0} y={0} width={state.doc.canvas.width} height={state.doc.canvas.height} fill={state.doc.canvas.background} />
-            {(state.doc.canvas.gridEnabled && !state.viewMode) && (
+            {state.doc.canvas.gridEnabled && !state.viewMode && (
               <rect x={0} y={0} width={state.doc.canvas.width} height={state.doc.canvas.height} fill={`url(#${gridPatternId})`} />
             )}
 
@@ -789,792 +751,29 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       </div>
       {pendingMagnifier && (
         <div className="absolute top-4 right-4 z-50">
-            <MagnifierOverlay
-              initialPercent={Math.round(pendingMagnifier.suggestedScale * 100)}
-              onApply={(percent) => {
-                const scroller = scrollRef.current;
-                if (!scroller) return setPendingMagnifier(null);
-                const containerRect = scroller.getBoundingClientRect();
-                const newScale = Math.max(0.1, Math.min(8, percent / 100));
+          <MagnifierOverlay
+            initialPercent={Math.round(pendingMagnifier.suggestedScale * 100)}
+            onApply={(percent) => {
+              const scroller = scrollRef.current;
+              if (!scroller) return setPendingMagnifier(null);
+              const containerRect = scroller.getBoundingClientRect();
+              const newScale = Math.max(0.1, Math.min(8, percent / 100));
 
-                // Center selection in viewport by computing pan in canvas units
-                const centerX = pendingMagnifier.box.x + pendingMagnifier.box.width / 2;
-                const centerY = pendingMagnifier.box.y + pendingMagnifier.box.height / 2;
-                const newPanX = centerX - containerRect.width / (2 * newScale);
-                const newPanY = centerY - containerRect.height / (2 * newScale);
-                const maxPanX = Math.max(0, state.doc.canvas.width - containerRect.width / newScale);
-                const maxPanY = Math.max(0, state.doc.canvas.height - containerRect.height / newScale);
+              // Center selection in viewport by computing pan in canvas units
+              const centerX = pendingMagnifier.box.x + pendingMagnifier.box.width / 2;
+              const centerY = pendingMagnifier.box.y + pendingMagnifier.box.height / 2;
+              const newPanX = centerX - containerRect.width / (2 * newScale);
+              const newPanY = centerY - containerRect.height / (2 * newScale);
+              const maxPanX = Math.max(0, state.doc.canvas.width - containerRect.width / newScale);
+              const maxPanY = Math.max(0, state.doc.canvas.height - containerRect.height / newScale);
 
-                engine.setZoom({ scale: newScale, panX: clamp(newPanX, 0, maxPanX), panY: clamp(newPanY, 0, maxPanY) });
-                setPendingMagnifier(null);
-              }}
-              onCancel={() => setPendingMagnifier(null)}
-            />
+              engine.setZoom({ scale: newScale, panX: clamp(newPanX, 0, maxPanX), panY: clamp(newPanY, 0, maxPanY) });
+              setPendingMagnifier(null);
+            }}
+            onCancel={() => setPendingMagnifier(null)}
+          />
         </div>
       )}
     </div>
   );
-}
-
-function RenderTree({
-  doc,
-  rootIds,
-  onRegister,
-  renderCustom,
-  api,
-}: {
-  doc: DesignerState["doc"];
-  rootIds: ElementId[];
-  onRegister: (id: ElementId, node: SVGElement | null) => void;
-  renderCustom: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
-  api: DesignerAPI;
-}) {
-  const sorted = [...rootIds]
-    .map((id) => doc.elements[id])
-    .filter(Boolean)
-    .sort((a, b) => (a!.zIndex ?? 0) - (b!.zIndex ?? 0)) as DesignerElement[];
-
-  return (
-    <>
-      {sorted.map((el) => (
-        <RenderElement key={el.id} el={el} doc={doc} onRegister={onRegister} renderCustom={renderCustom} api={api} />
-      ))}
-    </>
-  );
-}
-
-function RenderElement({
-  el,
-  doc,
-  onRegister,
-  renderCustom,
-  api,
-}: {
-  el: DesignerElement;
-  doc: DesignerState["doc"];
-  onRegister: (id: ElementId, node: SVGElement | null) => void;
-  renderCustom: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
-  api: DesignerAPI;
-}) {
-  if (el.hidden) return null;
-
-  const getTransform = (cx: number, cy: number) => {
-    const parts: string[] = [];
-    const meta = el as unknown as { flipH?: boolean; flipV?: boolean };
-    if (meta.flipH || meta.flipV) {
-      const sx = meta.flipH ? -1 : 1;
-      const sy = meta.flipV ? -1 : 1;
-      parts.push(`translate(${cx} ${cy}) scale(${sx} ${sy}) translate(${-cx} ${-cy})`);
-    }
-    if (el.rotation) parts.push(`rotate(${el.rotation} ${cx} ${cy})`);
-    return parts.length ? parts.join(" ") : undefined;
-  };
-
-  if (el.type === "group") {
-    const children = el.childIds
-      .map((id) => doc.elements[id])
-      .filter(Boolean)
-      .sort((a, b) => (a!.zIndex ?? 0) - (b!.zIndex ?? 0)) as DesignerElement[];
-
-    return (
-      <g ref={(node) => onRegister(el.id, node)} data-el-id={el.id}>
-        {children.map((child) => (
-          <RenderElement key={child.id} el={child} doc={doc} onRegister={onRegister} renderCustom={renderCustom} api={api} />
-        ))}
-      </g>
-    );
-  }
-
-  const opacity = el.opacity;
-
-  if (el.type === "rect") {
-    const cx = el.x + el.width / 2;
-    const cy = el.y + el.height / 2;
-    return (
-      <rect
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        x={el.x}
-        y={el.y}
-        width={el.width}
-        height={el.height}
-        rx={el.rx}
-        ry={el.ry}
-        fill={el.fill}
-        stroke={el.stroke}
-        strokeWidth={el.strokeWidth}
-        opacity={opacity}
-        transform={getTransform(cx, cy)}
-        className="cursor-move"
-        onMouseEnter={el.enableOnMouseHoverEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id }) : undefined}
-        onClick={el.enableOnMouseClickEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id }) : undefined}
-        onMouseLeave={el.enableOnMouseLeaveEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id }) : undefined}
-      />
-    );
-  }
-
-  if (el.type === "circle") {
-    return (
-      <circle
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        cx={el.cx}
-        cy={el.cy}
-        r={el.r}
-        fill={el.fill}
-        stroke={el.stroke}
-        strokeWidth={el.strokeWidth}
-        opacity={opacity}
-        className="cursor-move"
-        onMouseEnter={el.enableOnMouseHoverEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id }) : undefined}
-        onClick={el.enableOnMouseClickEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id }) : undefined}
-        onMouseLeave={el.enableOnMouseLeaveEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id }) : undefined}
-      />
-    );
-  }
-
-  if (el.type === "line") {
-    const cx = (el.x1 + el.x2) / 2;
-    const cy = (el.y1 + el.y2) / 2;
-    return (
-      <line
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        x1={el.x1}
-        y1={el.y1}
-        x2={el.x2}
-        y2={el.y2}
-        stroke={el.stroke}
-        strokeWidth={el.strokeWidth}
-        opacity={opacity}
-        transform={getTransform(cx, cy)}
-        className="cursor-move"
-        onMouseEnter={el.enableOnMouseHoverEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id }) : undefined}
-        onClick={el.enableOnMouseClickEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id }) : undefined}
-        onMouseLeave={el.enableOnMouseLeaveEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id }) : undefined}
-      />
-    );
-  }
-
-  if (el.type === "free") {
-    return (
-      <path
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        d={el.d}
-        fill={"none"}
-        stroke={el.stroke}
-        strokeWidth={el.strokeWidth}
-        opacity={opacity}
-        className="cursor-move"
-        onMouseEnter={el.enableOnMouseHoverEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id }) : undefined}
-        onClick={el.enableOnMouseClickEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id }) : undefined}
-        onMouseLeave={el.enableOnMouseLeaveEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id }) : undefined}
-      />
-    );
-  }
-
-  if (el.type === "image") {
-    const cx = el.x + el.width / 2;
-    const cy = el.y + el.height / 2;
-      const pra = el.fit === "stretch" ? "none" : el.preserveAspectRatio;
-      const transform = getTransform(cx, cy);
-      return (
-        <image
-          ref={(node) => onRegister(el.id, node)}
-          data-el-id={el.id}
-          href={el.href}
-          x={el.x}
-          y={el.y}
-          width={el.width}
-          height={el.height}
-          preserveAspectRatio={pra}
-          opacity={opacity}
-          transform={transform}
-          className="cursor-move"
-          role="img"
-          onMouseEnter={el.enableOnMouseHoverEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id }) : undefined}
-          onClick={el.enableOnMouseClickEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id }) : undefined}
-          onMouseLeave={el.enableOnMouseLeaveEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id }) : undefined}
-        >
-          <title>{el.name?.trim() ? el.name : "Image"}</title>
-        </image>
-      );
-  }
-
-  if (el.type === "text") {
-    const t = el as unknown as {
-      x: number;
-      y: number;
-      text: string;
-      fontSize: number;
-      fontWeight: string;
-      fontStyle?: string;
-      textDecoration?: string;
-      fill: string;
-      opacity: number;
-    };
-    const cx = t.x;
-    const cy = t.y;
-    const transform = getTransform(cx, cy);
-    return (
-      <text
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        x={t.x}
-        y={t.y}
-        fontSize={t.fontSize}
-        fontWeight={t.fontWeight}
-        fontStyle={t.fontStyle}
-        textDecoration={t.textDecoration}
-        fill={t.fill}
-        opacity={t.opacity}
-        transform={transform}
-        className="cursor-move"
-        onMouseEnter={el.enableOnMouseHoverEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id }) : undefined}
-        onClick={el.enableOnMouseClickEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id }) : undefined}
-        onMouseLeave={el.enableOnMouseLeaveEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id }) : undefined}
-      >
-        {t.text}
-      </text>
-    );
-  }
-
-  if (el.type === "custom") {
-    const cx = el.x + el.width / 2;
-    const cy = el.y + el.height / 2;
-    const transform = getTransform(cx, cy);
-    const content = renderCustom(el, doc);
-
-    return (
-      <g
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        opacity={opacity}
-        transform={transform}
-        className="cursor-move"
-        onMouseEnter={el.enableOnMouseHoverEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id }) : undefined}
-        onClick={el.enableOnMouseClickEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id }) : undefined}
-        onMouseLeave={el.enableOnMouseLeaveEventListener ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id }) : undefined}
-      >
-        <svg
-          x={el.x}
-          y={el.y}
-          width={el.width}
-          height={el.height}
-          viewBox={`0 0 ${Math.max(1, el.width)} ${Math.max(1, el.height)}`}
-          preserveAspectRatio="none"
-          overflow="visible"
-        >
-          {content}
-        </svg>
-      </g>
-    );
-  }
-
-  return null;
-}
-
-function SelectionOverlay({
-  box,
-  state,
-  onStartResize,
-  onStartRotate,
-  onStartLineEnd,
-  onStartCircleR,
-}: {
-  box: { x: number; y: number; width: number; height: number };
-  state: DesignerState;
-  onStartResize: (m: DragMode) => void;
-  onStartRotate: (m: DragMode) => void;
-  onStartLineEnd: (m: DragMode) => void;
-  onStartCircleR: (m: DragMode) => void;
-}) {
-  const singleId = state.selection.ids.length === 1 ? state.selection.ids[0] : null;
-  const single = singleId ? state.doc.elements[singleId] : null;
-
-  const stroke = "var(--foreground)";
-
-  // Small animation to make selection feel alive (GSAP usage)
-  useEffect(() => {
-    gsap.to(".designer-selection", { opacity: 0.9, duration: 0.15, overwrite: true });
-  }, [singleId, state.selection.ids.length]);
-
-  const eventToCanvas = (e: React.PointerEvent) => {
-    const svg = ((e.currentTarget as unknown as SVGGraphicsElement).ownerSVGElement as SVGSVGElement) ?? null;
-    const rect = svg?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    const clientX = e.clientX;
-    const clientY = e.clientY;
-    const scaleX = state.doc.canvas.width / rect.width;
-    const scaleY = state.doc.canvas.height / rect.height;
-    const x = (clientX - rect.left) * scaleX;
-    const y = (clientY - rect.top) * scaleY;
-    return { x, y };
-  };
-
-  const overlayTransform = (() => {
-    if (!single) return undefined;
-    if (single.type !== "rect" && single.type !== "image" && single.type !== "text" && single.type !== "custom") return undefined;
-    if (!single.rotation) return undefined;
-
-    // Match the same rotation pivot used by the element renderer.
-    if (single.type === "text") {
-      const cx = single.x;
-      const cy = single.y;
-      return `rotate(${single.rotation} ${cx} ${cy})`;
-    }
-
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
-    return `rotate(${single.rotation} ${cx} ${cy})`;
-  })();
-
-  const startRotationForResize = (() => {
-    if (!single) return 0;
-    if (single.type !== "rect" && single.type !== "image" && single.type !== "text" && single.type !== "custom") return 0;
-    return single.rotation || 0;
-  })();
-
-  return (
-    <g className="designer-selection" pointerEvents="none" opacity={0.9} transform={overlayTransform}>
-      <rect x={box.x} y={box.y} width={box.width} height={box.height} fill="none" stroke={stroke} strokeWidth={1} />
-
-      {single && (single.type === "rect" || single.type === "image" || single.type === "text" || single.type === "custom") && (
-        <>
-          <Handle
-            x={box.x}
-            y={box.y}
-            cursor="nwse-resize"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              const p = eventToCanvas(e);
-              if (single.type === "text") {
-                onStartResize({
-                  kind: "resize-text",
-                  id: single.id,
-                  handle: "nw",
-                  startX: p.x,
-                  startY: p.y,
-                  startFontSize: single.fontSize,
-                  startRotation: startRotationForResize,
-                });
-              } else {
-                onStartResize({
-                  kind: "resize-rect",
-                  id: single.id,
-                  handle: "nw",
-                  startX: p.x,
-                  startY: p.y,
-                  start: { x: single.x, y: single.y, w: single.width, h: single.height },
-                  startRotation: startRotationForResize,
-                });
-              }
-            }}
-          />
-
-          <Handle
-            x={box.x + box.width / 2}
-            y={box.y}
-            cursor="ns-resize"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              const p = eventToCanvas(e);
-              if (single.type === "text") {
-                onStartResize({
-                  kind: "resize-text",
-                  id: single.id,
-                  handle: "n",
-                  startX: p.x,
-                  startY: p.y,
-                  startFontSize: single.fontSize,
-                  startRotation: startRotationForResize,
-                });
-              } else {
-                onStartResize({
-                  kind: "resize-rect",
-                  id: single.id,
-                  handle: "n",
-                  startX: p.x,
-                  startY: p.y,
-                  start: { x: single.x, y: single.y, w: single.width, h: single.height },
-                  startRotation: startRotationForResize,
-                });
-              }
-            }}
-          />
-
-          <Handle
-            x={box.x + box.width}
-            y={box.y}
-            cursor="nesw-resize"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              const p = eventToCanvas(e);
-              if (single.type === "text") {
-                onStartResize({
-                  kind: "resize-text",
-                  id: single.id,
-                  handle: "ne",
-                  startX: p.x,
-                  startY: p.y,
-                  startFontSize: single.fontSize,
-                  startRotation: startRotationForResize,
-                });
-              } else {
-                onStartResize({
-                  kind: "resize-rect",
-                  id: single.id,
-                  handle: "ne",
-                  startX: p.x,
-                  startY: p.y,
-                  start: { x: single.x, y: single.y, w: single.width, h: single.height },
-                  startRotation: startRotationForResize,
-                });
-              }
-            }}
-          />
-
-          <Handle
-            x={box.x + box.width}
-            y={box.y + box.height / 2}
-            cursor="ew-resize"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              const p = eventToCanvas(e);
-              if (single.type === "text") {
-                onStartResize({
-                  kind: "resize-text",
-                  id: single.id,
-                  handle: "e",
-                  startX: p.x,
-                  startY: p.y,
-                  startFontSize: single.fontSize,
-                  startRotation: startRotationForResize,
-                });
-              } else {
-                onStartResize({
-                  kind: "resize-rect",
-                  id: single.id,
-                  handle: "e",
-                  startX: p.x,
-                  startY: p.y,
-                  start: { x: single.x, y: single.y, w: single.width, h: single.height },
-                  startRotation: startRotationForResize,
-                });
-              }
-            }}
-          />
-
-          <Handle
-            x={box.x}
-            y={box.y + box.height}
-            cursor="nesw-resize"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              const p = eventToCanvas(e);
-              if (single.type === "text") {
-                onStartResize({
-                  kind: "resize-text",
-                  id: single.id,
-                  handle: "sw",
-                  startX: p.x,
-                  startY: p.y,
-                  startFontSize: single.fontSize,
-                  startRotation: startRotationForResize,
-                });
-              } else {
-                onStartResize({
-                  kind: "resize-rect",
-                  id: single.id,
-                  handle: "sw",
-                  startX: p.x,
-                  startY: p.y,
-                  start: { x: single.x, y: single.y, w: single.width, h: single.height },
-                  startRotation: startRotationForResize,
-                });
-              }
-            }}
-          />
-
-          <Handle
-            x={box.x + box.width / 2}
-            y={box.y + box.height}
-            cursor="ns-resize"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              const p = eventToCanvas(e);
-              if (single.type === "text") {
-                onStartResize({
-                  kind: "resize-text",
-                  id: single.id,
-                  handle: "s",
-                  startX: p.x,
-                  startY: p.y,
-                  startFontSize: single.fontSize,
-                  startRotation: startRotationForResize,
-                });
-              } else {
-                onStartResize({
-                  kind: "resize-rect",
-                  id: single.id,
-                  handle: "s",
-                  startX: p.x,
-                  startY: p.y,
-                  start: { x: single.x, y: single.y, w: single.width, h: single.height },
-                  startRotation: startRotationForResize,
-                });
-              }
-            }}
-          />
-
-          <Handle
-            x={box.x + box.width}
-            y={box.y + box.height}
-            cursor="nwse-resize"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              const p = eventToCanvas(e);
-              if (single.type === "text") {
-                onStartResize({
-                  kind: "resize-text",
-                  id: single.id,
-                  handle: "se",
-                  startX: p.x,
-                  startY: p.y,
-                  startFontSize: single.fontSize,
-                  startRotation: startRotationForResize,
-                });
-              } else {
-                onStartResize({
-                  kind: "resize-rect",
-                  id: single.id,
-                  handle: "se",
-                  startX: p.x,
-                  startY: p.y,
-                  start: { x: single.x, y: single.y, w: single.width, h: single.height },
-                  startRotation: startRotationForResize,
-                });
-              }
-            }}
-          />
-
-          <Handle
-            x={box.x}
-            y={box.y + box.height / 2}
-            cursor="ew-resize"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              const p = eventToCanvas(e);
-              if (single.type === "text") {
-                onStartResize({
-                  kind: "resize-text",
-                  id: single.id,
-                  handle: "w",
-                  startX: p.x,
-                  startY: p.y,
-                  startFontSize: single.fontSize,
-                  startRotation: startRotationForResize,
-                });
-              } else {
-                onStartResize({
-                  kind: "resize-rect",
-                  id: single.id,
-                  handle: "w",
-                  startX: p.x,
-                  startY: p.y,
-                  start: { x: single.x, y: single.y, w: single.width, h: single.height },
-                  startRotation: startRotationForResize,
-                });
-              }
-            }}
-          />
-
-          <RotateHandle
-            x={box.x + box.width / 2}
-            y={box.y - 24}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              const center = getBBoxCenter(box);
-              const p = eventToCanvas(e);
-              const startAngle = Math.atan2(p.y - center.y, p.x - center.x);
-              onStartRotate({
-                kind: "rotate",
-                id: single.id,
-                startAngle,
-                startRotation: single.rotation,
-                center,
-              });
-            }}
-          />
-        </>
-      )}
-
-      {single && single.type === "line" && (
-        <>
-          <Handle
-            x={single.x1}
-            y={single.y1}
-            cursor="crosshair"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              onStartLineEnd({ kind: "line-end", id: single.id, end: "p1" });
-            }}
-          />
-          <Handle
-            x={single.x2}
-            y={single.y2}
-            cursor="crosshair"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              onStartLineEnd({ kind: "line-end", id: single.id, end: "p2" });
-            }}
-          />
-        </>
-      )}
-
-      {single && single.type === "circle" && (
-        <Handle
-          x={single.cx + single.r}
-          y={single.cy}
-          cursor="ew-resize"
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            onStartCircleR({ kind: "circle-r", id: single.id });
-          }}
-        />
-      )}
-    </g>
-  );
-}
-
-function Handle({
-  x,
-  y,
-  cursor,
-  onPointerDown,
-}: {
-  x: number;
-  y: number;
-  cursor: string;
-  onPointerDown: (e: React.PointerEvent) => void;
-}) {
-  const size = 10;
-  return (
-    <rect
-      x={x - size / 2}
-      y={y - size / 2}
-      width={size}
-      height={size}
-      fill="white"
-      stroke="var(--foreground)"
-      strokeWidth={1}
-      pointerEvents="all"
-        className={cursorToClass(cursor)}
-      onPointerDown={onPointerDown}
-    />
-  );
-}
-
-function RotateHandle({ x, y, onPointerDown }: { x: number; y: number; onPointerDown: (e: React.PointerEvent) => void }) {
-  const r = 6;
-  return (
-    <circle
-      cx={x}
-      cy={y}
-      r={r}
-      fill="white"
-      stroke="var(--foreground)"
-      strokeWidth={1}
-      pointerEvents="all"
-      className="cursor-grab"
-      onPointerDown={onPointerDown}
-    />
-  );
-}
-
-function cursorToClass(cursor: string): string {
-  switch (cursor) {
-    case "nwse-resize":
-      return "cursor-nwse-resize";
-    case "nesw-resize":
-      return "cursor-nesw-resize";
-    case "ns-resize":
-      return "cursor-ns-resize";
-    case "crosshair":
-      return "cursor-crosshair";
-    case "ew-resize":
-      return "cursor-ew-resize";
-    case "grab":
-      return "cursor-grab";
-    case "move":
-      return "cursor-move";
-    default:
-      return "cursor-default";
-  }
-}
-
-function pointsToPath(points: Array<{ x: number; y: number }>): string {
-  if (points.length < 2) return "";
-  const [first, ...rest] = points;
-  const parts = [`M ${first.x} ${first.y}`];
-  for (const p of rest) parts.push(`L ${p.x} ${p.y}`);
-  return parts.join(" ");
-}
-
-function MagnifierOverlay({
-  initialPercent,
-  onApply,
-  onCancel,
-}: {
-  initialPercent: number;
-  onApply: (percent: number) => void;
-  onCancel: () => void;
-}) {
-  const [percent, setPercent] = useState(initialPercent);
-  return (
-    <div className="rounded border border-black/20 bg-white p-2 shadow">
-      <div className="text-xs text-black/70 mb-1">Zoom</div>
-      <div className="flex items-center gap-2">
-        <button
-          className="px-2 py-1 rounded border"
-          onClick={() => setPercent((p) => Math.max(10, p - 10))}
-        >
-          -
-        </button>
-        <input
-          title="magnifier-percent"
-          aria-label="Magnifier percent"
-          className="w-16 px-2 py-1 rounded border text-right"
-          value={percent}
-          onChange={(e) => setPercent(Number(e.target.value || 0))}
-          type="number"
-        />
-        <div className="text-sm">%</div>
-        <button
-          className="px-2 py-1 rounded border"
-          onClick={() => setPercent((p) => Math.min(800, p + 10))}
-        >
-          +
-        </button>
-      </div>
-      <div className="flex items-center gap-2 mt-2">
-        <button className="px-2 py-1 rounded border" onClick={() => onApply(percent)}>
-          Apply
-        </button>
-        <button className="px-2 py-1 rounded border" onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
-async function fileToDataUrl(file: File): Promise<string> {
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("Failed to read image"));
-    reader.readAsDataURL(file);
-  });
 }

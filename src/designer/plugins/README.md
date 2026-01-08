@@ -13,7 +13,15 @@ Di project ini, **plugin** itu bukan “folder yang otomatis kebaca”. Plugin a
 Ada 2 jalur extensibility yang beda:
 
 1) **UI contributions** (toolbar + panel): lewat `DesignerRegistry`
-- Ribbon buttons: `registry.registerRibbonAction(...)`
+
+API yang disarankan (lebih “fixed” dan scalable):
+- Top ribbon items: `registry.registerTopRibbonItem(...)`
+- Left panel sections: `registry.registerLeftPanelSection(...)`
+- Bottom bar items: `registry.registerBottomBarItem(...)`
+- Dialog tools (center overlay): `registry.registerDialog(...)` + `registry.openDialog(...)`
+
+API legacy (tetap didukung supaya plugin lama tidak rusak):
+- Ribbon buttons: `registry.registerRibbonAction(...)` (akan tampil di sisi kanan ribbon)
 - Properties panel sections: `registry.registerPropertiesSection(...)`
 
 2) **Custom elements** (palette + render SVG + actions): lewat `ElementRegistry`
@@ -47,7 +55,7 @@ export const myPlugin: DesignerPlugin = {
   activate: ({ api, registry, elements }) => {
     const disposers: Array<() => void> = [];
 
-    // 1) Tambah tombol di Ribbon
+    // 1) Tambah tombol di Ribbon (legacy)
     disposers.push(
       registry.registerRibbonAction({
         id: "my.myPlugin.hello",
@@ -84,6 +92,36 @@ export const myPlugin: DesignerPlugin = {
     return disposers;
   },
 };
+```
+
+### Bonus: pakai UI Slot API (recommended)
+
+Slot API ini membuat UI kamu lebih rapi karena semua “tempat” kontribusi UI jelas dan baku.
+
+Contoh top ribbon button + dialog tool:
+
+```ts
+disposers.push(
+  registry.registerDialog({
+    id: "my.myPlugin.dialog",
+    title: "My Tool",
+    render: (ctx: unknown) => {
+      // ctx punya { engine, state, api, host, dialog }
+      return "...";
+    },
+  }),
+);
+
+disposers.push(
+  registry.registerTopRibbonItem({
+    kind: "button",
+    id: "my.myPlugin.openDialog",
+    placement: "right",
+    order: 5,
+    label: "My Tool",
+    onClick: () => registry.openDialog("my.myPlugin.dialog"),
+  }),
+);
 ```
 
 Kalau kamu tetap mau file `.ts` (tanpa `.tsx`), jangan pakai JSX. Return UI-nya pakai `React.createElement(...)` (lihat contoh di `src/designer/plugins/testPropertiesPanel.ts`).
@@ -132,11 +170,26 @@ Contoh pola yang benar:
 activate: ({ api, registry, elements }) => {
   const disposers: Array<() => void> = [];
   disposers.push(registry.registerRibbonAction(...));
+  // recommended:
+  disposers.push(registry.registerTopRibbonItem(...));
+  disposers.push(registry.registerLeftPanelSection(...));
+  disposers.push(registry.registerBottomBarItem(...));
+  disposers.push(registry.registerDialog(...));
   disposers.push(registry.registerPropertiesSection(...));
   disposers.push(elements.register(myElementDef));
   return disposers;
 }
 ```
+
+---
+
+## Aturan baku (biar plugin tidak ngawur / tidak drift)
+
+- `id` harus unik dan namespaced: `company.feature.thing`.
+- Jangan akses DOM langsung (querySelector) untuk “nyolok” UI; selalu lewat `DesignerRegistry`.
+- UI plugin tidak boleh mutate state doc secara langsung; selalu lewat `DesignerAPI` / `DesignerEngine`.
+- Semua `register*` wajib di-cleanup dengan disposer yang dikembalikan.
+- Kalau butuh state eksternal (MQTT/HTTP/SQL), taruh di layer `runtime/*` lalu panggil `DesignerAPI`.
 
 ---
 

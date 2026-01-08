@@ -8,13 +8,15 @@ import type { DesignerAPI } from "../../core/api";
 import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { DesignerHost } from "../../core/host";
 import { Ribbon } from "./Ribbon";
-import { PalettePanel } from "./PalettePanel";
-import { PropertiesPanel } from "./PropertiesPanel";
+import { LeftPanel } from "./LeftPanel";
+import { BottomBar } from "./BottomBar";
+import { DialogHost } from "./DialogHost";
 import { SvgCanvas } from "./SvgCanvas";
 import { DesignerHostProvider } from "../hooks/useDesignerHost";
 import { numericDisplayElementDefinition } from "../../../elements/numericDisplay/numericDisplay.definition";
 import { webEmbedElementDefinition } from "../../../elements/webEmbed/webEmbed.definition";
 import { myPlugin } from "../../plugins/myPlugin";
+import { registerBuiltInUiContributions } from "./builtins/registerBuiltInUi";
 
 type PropertiesSectionRenderCtx = {
   engine: DesignerEngine;
@@ -99,6 +101,14 @@ export function DesignerApp() {
     // Note: plugins are NOT auto-activated by createDesignerHost().
     disposers.push(host.plugins.register(myPlugin));
     host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements });
+
+    // Register built-in UI sections into the registry so the shell is fully pluggable.
+    disposers.push(
+      ...registerBuiltInUiContributions({
+        host,
+        engine,
+      }),
+    );
 
     disposers.push(
       host.registry.registerPropertiesSection({
@@ -237,25 +247,18 @@ export function DesignerApp() {
 
   return (
     <DesignerHostProvider host={host}>
-      <div className="h-screen w-screen flex flex-col">
+      <div className="h-screen w-screen flex flex-col relative">
         <div className="h-16 w-full border-b border-black/10">
           <Ribbon engine={engine} state={state} />
         </div>
-        <div className="flex-1 w-full flex">
-          <div className="w-[20vw] h-full border-r border-black/10 overflow-auto">
-            <div className="">
-              <div className="p-3 space-y-4 w-full h-[30vh] border border-black/10 overflow-auto">
-                <PalettePanel activeTool={state.tool} onToolChange={setTool} />
-              </div>
-              <div className="p-3 space-y-4 w-full h-[65vh] border border-black/10 overflow-auto">
-                {!state.viewMode && <PropertiesPanel engine={engine} state={state} />}
-              </div>
-            </div>
-          </div>
-          <div className="">
+        <div className="flex-1 w-full flex min-h-0">
+          <LeftPanel engine={engine} state={state} setTool={setTool} />
+          <div className="min-w-0 flex-1">
             <SvgCanvas engine={engine} state={state} />
           </div>
         </div>
+        <BottomBar engine={engine} state={state} />
+        <DialogHost engine={engine} state={state} />
       </div>
     </DesignerHostProvider>
   );
