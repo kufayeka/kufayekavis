@@ -14,6 +14,7 @@ import { SvgCanvas } from "./SvgCanvas";
 import { DesignerHostProvider } from "../hooks/useDesignerHost";
 import { numericDisplayElementDefinition } from "../../../elements/numericDisplay/numericDisplay.definition";
 import { webEmbedElementDefinition } from "../../../elements/webEmbed/webEmbed.definition";
+import { myPlugin } from "../../plugins/myPlugin";
 
 type PropertiesSectionRenderCtx = {
   engine: DesignerEngine;
@@ -93,6 +94,11 @@ export function DesignerApp() {
 
     disposers.push(host.elements.register(numericDisplayElementDefinition));
     disposers.push(host.elements.register(webEmbedElementDefinition));
+
+    // Register + activate plugins.
+    // Note: plugins are NOT auto-activated by createDesignerHost().
+    disposers.push(host.plugins.register(myPlugin));
+    host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements });
 
     disposers.push(
       host.registry.registerPropertiesSection({

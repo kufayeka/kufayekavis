@@ -29,9 +29,15 @@ Ada 2 jalur extensibility yang beda:
 ## Quick Start: bikin plugin pertama
 
 ### 1) Buat file plugin
-Buat file baru misalnya `src/designer/plugins/myPlugin.ts`:
+Kalau contoh plugin kamu mengembalikan JSX (`<div>...</div>`) dari `render`, file plugin-nya **harus** `.tsx`.
 
-```ts
+Penting: “ada 2 return” itu **normal** karena beda scope:
+- `activate()` return array `disposers` (cleanup)
+- `render()` return UI (ReactNode/JSX)
+
+Buat file baru misalnya `src/designer/plugins/myPlugin.tsx`:
+
+```tsx
 import type { DesignerPlugin } from "../core/plugins";
 import type { DesignerAPI } from "../core/api";
 import type { DesignerState } from "../core/engine";
@@ -80,15 +86,27 @@ export const myPlugin: DesignerPlugin = {
 };
 ```
 
+Kalau kamu tetap mau file `.ts` (tanpa `.tsx`), jangan pakai JSX. Return UI-nya pakai `React.createElement(...)` (lihat contoh di `src/designer/plugins/testPropertiesPanel.ts`).
+
 ### 2) Register + activate plugin di app
-Buka `src/designer/ui/components/DesignerApp.tsx` (atau tempat host dibuat), lalu tambahkan:
+Sekarang plugin **harus** di-wire di tempat host dibuat (contoh default project ini: `src/designer/ui/components/DesignerApp.tsx`).
+
+Di file itu:
+1) import plugin
+2) `register(...)` ke `host.plugins`
+3) `activateAll(...)` dengan context `{ api, registry, elements }`
+
+Contoh:
 
 ```ts
 import { myPlugin } from "../../plugins/myPlugin";
 
 // setelah host dibuat
-host.plugins.register(myPlugin);
+const dispose = host.plugins.register(myPlugin);
 host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements });
+
+// saat unmount
+dispose();
 ```
 
 Poin penting:
@@ -98,6 +116,50 @@ Poin penting:
 ### 3) Cek hasil
 - Tombol muncul di Ribbon
 - Section muncul di Properties panel bagian "Plugins"
+
+---
+
+## Lifecycle plugin (penting biar robust)
+
+Plugin kamu harus mengembalikan *cleanup functions* (disposers) dari `activate()`.
+Tujuannya:
+- kalau page reload / component unmount, registry & element registry tidak “nyangkut”
+- plugin bisa di-reload dengan aman
+
+Contoh pola yang benar:
+
+```ts
+activate: ({ api, registry, elements }) => {
+  const disposers: Array<() => void> = [];
+  disposers.push(registry.registerRibbonAction(...));
+  disposers.push(registry.registerPropertiesSection(...));
+  disposers.push(elements.register(myElementDef));
+  return disposers;
+}
+```
+
+---
+
+## Struktur folder yang direkomendasikan
+
+Ini struktur yang enak dipelihara (bisa kamu adopsi pelan-pelan):
+
+```
+src/designer/plugins/
+  README.md
+  myPlugin.tsx
+  runtime/
+    mqttBridge.ts
+src/elements/
+  myElement/
+    myElement.definition.ts
+    myElement.render.tsx
+```
+
+Pemisahan ini sengaja:
+- plugin = wiring & UI contributions
+- elements = definisi elemen & rendering
+- runtime = logic eksternal (mis. MQTT, WebSocket, polling) yang memanggil `DesignerAPI`
 
 ---
 
@@ -114,7 +176,7 @@ Intinya ada 2 file:
 
 ### ElementDefinition minimal
 
-```ts
+```tsx
 import type { ElementDefinition } from "../../designer/core/elements";
 
 export const myElementDef: ElementDefinition = {
@@ -173,6 +235,11 @@ Pola umum:
 3) render control -> panggil `api.updateCustomProps()` atau `api.updateElement()`
 
 Contoh real bisa dilihat di `DesignerApp.tsx` (section Numeric Display).
+
+Tips praktik:
+- di `render(ctx)` selalu cek selection dulu
+- kalau selection bukan element yang kamu target, return `null`
+- semua update lewat `api.updateElement(...)` atau `api.updateCustomProps(...)`
 
 ---
 
@@ -240,6 +307,14 @@ Nanti MQTT client kamu tinggal panggil:
 bridge.handleMessage(topic, parsedPayload);
 ```
 
+### Di mana bikin bridge ini?
+Pola termudah:
+- bikin di `DesignerApp.tsx` (atau page `/online`) di dalam `useEffect`
+- pass `host.api` ke `createRuntimeBridge(host.api)`
+- subscribe MQTT event → panggil `bridge.handleMessage(...)`
+
+Dengan cara ini, kamu tidak perlu mengubah element renderer sama sekali.
+
 ### Catatan penting untuk Online mode
 - Kalau halaman `/online` harus read-only (nggak bisa edit), UI sudah bisa di-`viewMode=true`.
 - Tapi update dari MQTT (runtime) tetap bisa jalan karena itu update state programmatic.
@@ -264,3 +339,11 @@ bridge.handleMessage(topic, parsedPayload);
 - API: `src/designer/core/api.ts`
 - Host: `src/designer/core/host.ts`
 - App wiring (host + register elements/sections): `src/designer/ui/components/DesignerApp.tsx`
+
+---
+
+## Contoh yang sudah ada di repo
+
+- Plugin TSX example: `src/designer/plugins/myPlugin.tsx`
+- Plugin TS (tanpa JSX) example: `src/designer/plugins/testPropertiesPanel.ts`
+- Custom element example: `src/elements/numericDisplay/*`
