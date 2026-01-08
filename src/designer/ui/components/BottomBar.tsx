@@ -25,6 +25,8 @@ export function BottomBar({ engine, state }: { engine: DesignerEngine; state: De
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.id.localeCompare(b.id));
   }, [ctx, items]);
 
+  if (visible.length === 0) return null;
+
   return (
     <div className="h-10 w-full border-t border-black/10 px-3 flex items-center gap-2">
       {visible.map((it) => (

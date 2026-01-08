@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo } from "react";
+import { useSyncExternalStore } from "react";
 import { createDesignerHost } from "../../core/host";
 import { useDesignerEngine } from "../hooks/useDesignerEngine";
 import type { ToolType } from "../../core/types";
@@ -9,13 +10,16 @@ import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { DesignerHost } from "../../core/host";
 import { Ribbon } from "./Ribbon";
 import { LeftPanel } from "./LeftPanel";
+import { RightPanel } from "./RightPanel";
 import { BottomBar } from "./BottomBar";
 import { DialogHost } from "./DialogHost";
+import { PopupHost } from "./PopupHost";
 import { SvgCanvas } from "./SvgCanvas";
 import { DesignerHostProvider } from "../hooks/useDesignerHost";
 import { numericDisplayElementDefinition } from "../../../elements/numericDisplay/numericDisplay.definition";
 import { webEmbedElementDefinition } from "../../../elements/webEmbed/webEmbed.definition";
 import { myPlugin } from "../../plugins/myPlugin";
+import { mqttScadaPlugin } from "../../plugins/mqttScadaPlugin";
 import { registerBuiltInUiContributions } from "./builtins/registerBuiltInUi";
 
 type PropertiesSectionRenderCtx = {
@@ -29,6 +33,12 @@ export function DesignerApp() {
   const host = useMemo(() => createDesignerHost(), []);
   const engine = host.engine;
   const { state } = useDesignerEngine(engine);
+
+  const uiLayout = useSyncExternalStore(
+    (listener) => host.registry.subscribe(listener),
+    () => host.registry.getUiLayout(),
+    () => host.registry.getUiLayout(),
+  );
 
   // Autosave/restore project to localStorage for robustness across refresh.
   useEffect(() => {
@@ -100,6 +110,7 @@ export function DesignerApp() {
     // Register + activate plugins.
     // Note: plugins are NOT auto-activated by createDesignerHost().
     disposers.push(host.plugins.register(myPlugin));
+    disposers.push(host.plugins.register(mqttScadaPlugin));
     host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements });
 
     // Register built-in UI sections into the registry so the shell is fully pluggable.
@@ -171,7 +182,7 @@ export function DesignerApp() {
         }
       }
     };
-  }, [host]);
+  }, [engine, host]);
 
   const setTool = useCallback(
     (tool: ToolType) => {
@@ -252,13 +263,15 @@ export function DesignerApp() {
           <Ribbon engine={engine} state={state} />
         </div>
         <div className="flex-1 w-full flex min-h-0">
-          <LeftPanel engine={engine} state={state} setTool={setTool} />
+          {uiLayout.leftPanelVisible && <LeftPanel engine={engine} state={state} setTool={setTool} />}
           <div className="min-w-0 flex-1">
             <SvgCanvas engine={engine} state={state} />
           </div>
+          {uiLayout.rightPanelVisible && <RightPanel engine={engine} state={state} />}
         </div>
         <BottomBar engine={engine} state={state} />
         <DialogHost engine={engine} state={state} />
+        <PopupHost engine={engine} state={state} />
       </div>
     </DesignerHostProvider>
   );

@@ -1,5 +1,5 @@
 import React from "react";
-import type { DesignerElement } from "../../designer/core/types";
+import type { CustomElement, DesignerElement } from "../../designer/core/types";
 
 type RenderCtx = {
   element: DesignerElement;
@@ -28,12 +28,13 @@ function normalizeUrl(url: string): string {
 
 export function renderWebEmbed(ctx: unknown): unknown {
     const { element } = ctx as RenderCtx;
-    const el = element as any; // Cast to access custom props
-    const props = el.props || {};
-    const url = normalizeUrl(props.url || "https://example.com");
-    const allowFullscreen = props.allowFullscreen ? "allowfullscreen" : "";
-    const allowScripts = props.allowScripts ? "" : "sandbox"; // If not allowing scripts, use sandbox
-    const title = props.title || "Embedded Web Content";
+    if (element.type !== "custom") return null;
+    const el = element as CustomElement;
+    const props = (el.props ?? {}) as Record<string, unknown>;
+    const url = normalizeUrl(String(props.url ?? "https://example.com"));
+    const allowFullscreen = Boolean(props.allowFullscreen);
+    const allowScripts = Boolean(props.allowScripts);
+    const title = String(props.title ?? "Embedded Web Content");
 
     // For SVG canvas, we use foreignObject to embed HTML
     return React.createElement(
@@ -75,10 +76,11 @@ export function renderWebEmbed(ctx: unknown): unknown {
 
 export function exportWebEmbedSvg(ctx: unknown): string {
     const { element } = ctx as RenderCtx;
-    const el = element as any;
-    const props = el.props || {};
-    const url = normalizeUrl(props.url || "https://example.com");
-    const title = props.title || "Embedded Web Content";
+    if (element.type !== "custom") return "";
+    const el = element as CustomElement;
+    const props = (el.props ?? {}) as Record<string, unknown>;
+    const url = normalizeUrl(String(props.url ?? "https://example.com"));
+    void props;
 
     // For SVG export, we can't actually embed iframes, so we'll show a placeholder
     return `<rect x="0" y="0" width="${el.width}" height="${el.height}" fill="${el.fill || 'white'}" stroke="${el.stroke || '#ccc'}" stroke-width="${el.strokeWidth || 1}" rx="4" />

@@ -10,7 +10,14 @@ export function stripHistory(doc: DesignerDocument | DesignerDocumentSnapshot): 
   const anyDoc = doc as unknown as Record<string, unknown>;
   const rest = { ...anyDoc };
   delete (rest as { history?: unknown }).history;
+  delete (rest as { pluginSettings?: unknown }).pluginSettings;
   return rest as unknown as DesignerDocumentSnapshot;
+}
+
+function getPluginSettingsMap(doc: DesignerDocument): Record<string, unknown> | undefined {
+  const value = (doc as unknown as { pluginSettings?: unknown }).pluginSettings;
+  if (!isObject(value)) return undefined;
+  return value;
 }
 
 export function getHistory(doc: DesignerDocument): DesignerHistory {
@@ -55,8 +62,11 @@ export function commitDocChange(prevDoc: DesignerDocument, nextDoc: DesignerDocu
 
   const past = [...prevHistory.past, prevSnap].slice(-limit);
 
+  const pluginSettings = getPluginSettingsMap(nextDoc) ?? getPluginSettingsMap(prevDoc);
+
   return {
     ...nextSnap,
+    ...(pluginSettings !== undefined ? { pluginSettings } : {}),
     history: {
       limit,
       past,
@@ -83,9 +93,12 @@ export function undoDoc(doc: DesignerDocument): { doc: DesignerDocument; didUndo
   const nextPast = history.past.slice(0, -1);
   const nextFuture = [currentSnap, ...history.future].slice(0, history.limit);
 
+  const pluginSettings = getPluginSettingsMap(doc);
+
   return {
     doc: {
       ...prev,
+      ...(pluginSettings !== undefined ? { pluginSettings } : {}),
       history: {
         limit: history.limit,
         past: nextPast,
@@ -106,9 +119,12 @@ export function redoDoc(doc: DesignerDocument): { doc: DesignerDocument; didRedo
   const nextPast = [...history.past, currentSnap].slice(-history.limit);
   const nextFuture = history.future.slice(1);
 
+  const pluginSettings = getPluginSettingsMap(doc);
+
   return {
     doc: {
       ...next,
+      ...(pluginSettings !== undefined ? { pluginSettings } : {}),
       history: {
         limit: history.limit,
         past: nextPast,

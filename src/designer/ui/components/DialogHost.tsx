@@ -33,7 +33,7 @@ export function DialogHost({ engine, state }: { engine: DesignerEngine; state: D
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/20"
+        className="absolute inset-0 bg-black/20 h-full w-full"
         onMouseDown={() => host.registry.closeDialog()}
       />
       <div className="relative w-[min(720px,90vw)] max-h-[80vh] bg-white rounded border border-black/15 shadow-sm overflow-hidden">

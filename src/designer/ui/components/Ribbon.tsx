@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSyncExternalStore } from "react";
 import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { RibbonAction, TopRibbonItem } from "../../core/registry";
@@ -9,6 +9,10 @@ import { useDesignerHost } from "../hooks/useDesignerHost";
 
 export function Ribbon({ engine, state }: { engine: DesignerEngine; state: DesignerState }) {
   const host = useDesignerHost();
+
+  const derivedZoomPercent = Math.round(state.zoom.scale * 100);
+  const [isZoomEditing, setIsZoomEditing] = useState(false);
+  const [zoomPercentText, setZoomPercentText] = useState(() => String(derivedZoomPercent));
 
   const topRibbonItems = useSyncExternalStore(
     (listener) => host.registry.subscribe(listener),
@@ -79,25 +83,61 @@ export function Ribbon({ engine, state }: { engine: DesignerEngine; state: Desig
   };
 
   return (
-    <div className="h-full w-full flex items-center justify-between px-3 gap-3">
-      <div className="flex items-center gap-2">{left.map(renderItem)}</div>
-      <div className="flex items-center gap-2">{right.map(renderItem)}</div>
-      <div className="flex items-center gap-2">
-        <button
-          className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
-          onClick={() => engine.setZoom({ scale: state.zoom.scale / 1.1 })}
-        >
-          -
-        </button>
-        <div className="min-w-[80px] text-center tabular-nums">
-          {Math.round(state.zoom.scale * 100)}%
+    <div className="h-full w-full px-3">
+      <div className="h-full w-full overflow-x-auto overflow-y-hidden">
+        <div className="h-full min-w-max flex flex-nowrap items-center gap-3 whitespace-nowrap">
+          <div className="flex flex-nowrap items-center gap-2">{left.map(renderItem)}</div>
+          <div className="flex flex-nowrap items-center gap-2">{right.map(renderItem)}</div>
+          <div className="flex flex-nowrap items-center gap-2">
+            <button
+              className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
+              onClick={() => engine.setZoom({ scale: state.zoom.scale / 1.1 })}
+            >
+              -
+            </button>
+            <input
+              className="w-[80px] text-center tabular-nums px-2 py-1.5 rounded border border-black/15"
+              inputMode="numeric"
+              type="number"
+              min={10}
+              max={800}
+              step={1}
+              value={isZoomEditing ? zoomPercentText : String(derivedZoomPercent)}
+              onFocus={() => {
+                setIsZoomEditing(true);
+                setZoomPercentText(String(derivedZoomPercent));
+              }}
+              onBlur={() => {
+                setIsZoomEditing(false);
+                const n = Number(zoomPercentText);
+                if (!Number.isFinite(n)) {
+                  setZoomPercentText(String(derivedZoomPercent));
+                  return;
+                }
+                const clamped = Math.max(10, Math.min(800, n));
+                engine.setZoom({ scale: clamped / 100 });
+                setZoomPercentText(String(Math.round(clamped)));
+              }}
+              onChange={(e) => setZoomPercentText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+                if (e.key === "Escape") {
+                  setIsZoomEditing(false);
+                  setZoomPercentText(String(derivedZoomPercent));
+                  (e.currentTarget as HTMLInputElement).blur();
+                }
+              }}
+              aria-label="Zoom percent"
+              title="Zoom (%)"
+            />
+            <button
+              className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
+              onClick={() => engine.setZoom({ scale: state.zoom.scale * 1.1 })}
+            >
+              +
+            </button>
+          </div>
         </div>
-        <button
-          className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
-          onClick={() => engine.setZoom({ scale: state.zoom.scale * 1.1 })}
-        >
-          +
-        </button>
       </div>
     </div>
   );

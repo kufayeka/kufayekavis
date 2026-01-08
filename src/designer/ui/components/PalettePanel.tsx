@@ -7,7 +7,6 @@ import { useSyncExternalStore } from "react";
 const tools: Array<{ tool: ToolType; label: string; draggable?: boolean; dragId?: string }> = [
   { tool: "select", label: "Select", draggable: false },
   { tool: "free", label: "Free Draw", draggable: false },
-  { tool: "magnifier", label: "Magnifier", draggable: false },
 ];
 
 export function PalettePanel({

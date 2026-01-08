@@ -8,6 +8,8 @@ import { getElementBBox, getSelectionBBox } from "../../core/geometry";
 import { clamp } from "../../core/math";
 import { translateElement } from "../../core/transform";
 import { useDesignerHost } from "../hooks/useDesignerHost";
+import { useSyncExternalStore } from "react";
+import type { CanvasOverlayItem } from "../../core/registry";
 
 import type { DragMode } from "./svgCanvas/dragTypes";
 import { MagnifierOverlay, SelectionOverlay } from "./svgCanvas/overlays";
@@ -32,6 +34,21 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
   >(null);
 
   const selectionBox = useMemo(() => getSelectionBBox(state.selection.ids, state.doc), [state.selection.ids, state.doc]);
+
+  const canvasOverlays = useSyncExternalStore(
+    (listener) => host.registry.subscribe(listener),
+    () => host.registry.getCanvasOverlayItems(),
+    () => host.registry.getCanvasOverlayItems(),
+  ) as CanvasOverlayItem[];
+
+  const overlayCtx = useMemo(() => ({ engine, state, api: host.api, host }), [engine, host, state]);
+
+  const visibleOverlays = useMemo(() => {
+    return canvasOverlays
+      .filter((it) => (it.when ? it.when(overlayCtx) : true))
+      .slice()
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.id.localeCompare(b.id));
+  }, [canvasOverlays, overlayCtx]);
 
   const renderCustom = useCallback(
     (el: DesignerElement, doc: DesignerState["doc"]) => {
@@ -348,7 +365,8 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
   }, [engine, clientToCanvas, finalizeMarqueeSelection, snapIfEnabled]);
 
   const onCanvasPointerDown = (e: React.PointerEvent) => {
-    // In view mode we don't allow selection/movement
+    // In view mode we don't allow selection/movement, but we still want pointer events
+    // to bubble for canvas/element event output (handled via onClick/onMouseEnter/onMouseLeave).
     if (engine.getState().viewMode) return;
     const target = e.target as Element | null;
     const idNode = (target?.closest?.("[data-el-id]") as Element | null) ?? null;
@@ -660,8 +678,13 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
 
   const gridPatternId = "gridPattern";
 
+  const canvasEventTopic = useMemo(() => {
+    // Plugin can override this via api.publishEvent mapping; keep a stable default.
+    return "default/events";
+  }, []);
+
   return (
-    <div ref={scrollRef} className="h-full w-full">
+    <div ref={scrollRef} className="h-full w-full relative">
       <div className="min-h-full min-w-full flex items-start justify-start p-4">
         <svg
           ref={svgRef}
@@ -670,6 +693,19 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
           viewBox={viewBox}
           className="border border-black/20 bg-transparent"
           onPointerDown={onCanvasPointerDown}
+          onClick={(e) => {
+            const target = e.target as Element | null;
+            const idNode = (target?.closest?.("[data-el-id]") as Element | null) ?? null;
+            const id = (idNode?.getAttribute?.("data-el-id") as ElementId | null) ?? null;
+            if (id) return;
+            host.api.publishEvent(canvasEventTopic, { eventType: "onCanvasClick" });
+          }}
+          onMouseEnter={() => {
+            host.api.publishEvent(canvasEventTopic, { eventType: "onCanvasEnter" });
+          }}
+          onMouseLeave={() => {
+            host.api.publishEvent(canvasEventTopic, { eventType: "onCanvasLeave" });
+          }}
           onDrop={onCanvasDrop}
           onDragOver={onCanvasDragOver}
           onWheel={onWheel}
@@ -749,6 +785,17 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
           </g>
         </svg>
       </div>
+
+      {visibleOverlays.length > 0 && (
+        <div className="absolute inset-0 pointer-events-none">
+          {visibleOverlays.map((it) => (
+            <div key={it.id} className="pointer-events-auto">
+              {it.render(overlayCtx) as React.ReactNode}
+            </div>
+          ))}
+        </div>
+      )}
+
       {pendingMagnifier && (
         <div className="absolute top-4 right-4 z-50">
           <MagnifierOverlay

@@ -5,6 +5,8 @@ import { createDesignerHost } from "../../designer/core/host";
 import { useDesignerEngine } from "../../designer/ui/hooks/useDesignerEngine";
 import { DesignerHostProvider } from "../../designer/ui/hooks/useDesignerHost";
 import { SvgCanvas } from "../../designer/ui/components/SvgCanvas";
+import { DialogHost } from "../../designer/ui/components/DialogHost";
+import { PopupHost } from "../../designer/ui/components/PopupHost";
 import { numericDisplayElementDefinition } from "../../elements/numericDisplay/numericDisplay.definition";
 import { webEmbedElementDefinition } from "../../elements/webEmbed/webEmbed.definition";
 
@@ -50,8 +52,10 @@ export default function OnlinePage() {
 
   return (
     <DesignerHostProvider host={host}>
-      <div className="h-screen w-screen">
+      <div className="h-screen w-screen relative">
         <SvgCanvas engine={engine} state={state} />
+        <DialogHost engine={engine} state={state} />
+        <PopupHost engine={engine} state={state} />
       </div>
     </DesignerHostProvider>
   );

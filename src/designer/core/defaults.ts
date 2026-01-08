@@ -27,6 +27,7 @@ export function createEmptyDocument(): DesignerDocument {
     elements: {},
     rootIds: [],
     nextZ: 1,
+    pluginSettings: {},
     history: {
       limit: 10,
       past: [],

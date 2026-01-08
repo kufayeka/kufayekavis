@@ -139,6 +139,8 @@ export type DesignerDocumentSnapshot = {
   nextZ: number;
 };
 
+export type PluginSettingsMap = Record<string, unknown>;
+
 export type DesignerHistory = {
   limit: number;
   past: DesignerDocumentSnapshot[];
@@ -151,6 +153,9 @@ export type DesignerDocument = {
   elements: Record<ElementId, DesignerElement>;
   rootIds: ElementId[];
   nextZ: number;
+
+  // Optional plugin settings. Stored in project JSON but excluded from undo/redo history.
+  pluginSettings?: PluginSettingsMap;
 
   // Optional to keep backward compatibility with older exported JSON.
   history?: DesignerHistory;

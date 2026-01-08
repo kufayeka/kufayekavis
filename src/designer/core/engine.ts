@@ -108,7 +108,7 @@ export class DesignerEngine {
     const base = this.pendingHistoryBaseDoc;
     const baseSnapJson = this.pendingHistoryBaseSnapJson;
     const current = ensureHistory(this.state.doc);
-    const currentSnapJson = JSON.stringify(current, (key, value) => (key === "history" ? undefined : value));
+    const currentSnapJson = JSON.stringify(current, (key, value) => (key === "history" || key === "pluginSettings" ? undefined : value));
 
     // If nothing changed, keep current doc but drop pending markers.
     if (baseSnapJson && currentSnapJson === baseSnapJson) {
@@ -147,7 +147,7 @@ export class DesignerEngine {
     if (!this.pendingHistoryBaseDoc) {
       const base = this.state.doc;
       this.pendingHistoryBaseDoc = base;
-      this.pendingHistoryBaseSnapJson = JSON.stringify(base, (key, value) => (key === "history" ? undefined : value));
+      this.pendingHistoryBaseSnapJson = JSON.stringify(base, (key, value) => (key === "history" || key === "pluginSettings" ? undefined : value));
     }
 
     const baseHistory = ensureHistory(this.pendingHistoryBaseDoc).history!;
@@ -190,6 +190,24 @@ export class DesignerEngine {
 
   setViewMode(v: boolean) {
     this.setState({ ...this.state, viewMode: v });
+  }
+
+  getPluginSettings(pluginId: string): unknown {
+    const map = (this.state.doc as unknown as { pluginSettings?: Record<string, unknown> }).pluginSettings ?? {};
+    return map[pluginId];
+  }
+
+  setPluginSettings(pluginId: string, value: unknown): void {
+    const cur = (this.state.doc as unknown as { pluginSettings?: Record<string, unknown> }).pluginSettings ?? {};
+    const nextSettings = { ...cur, [pluginId]: value };
+    // Plugin settings should not affect undo/redo history; update doc directly.
+    this.setState({
+      ...this.state,
+      doc: {
+        ...this.state.doc,
+        pluginSettings: nextSettings,
+      },
+    });
   }
 
   setCanvas(patch: Partial<CanvasSettings>) {

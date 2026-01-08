@@ -193,6 +193,46 @@ activate: ({ api, registry, elements }) => {
 
 ---
 
+## SCADA MQTT plugin (remote control + event output)
+
+Plugin bawaan: `system.mqttScada` (file: `src/designer/plugins/mqttScadaPlugin.tsx`).
+
+Fungsi:
+- **UI remote control interface**: subscribe topic MQTT (WebSocket) dan menjalankan command untuk canvas/element lewat `DesignerAPI`.
+- **UI event output interface**: publish event onClick/onHover/onLeave dari element (dan event basic dari canvas) ke topic MQTT.
+
+### Konfigurasi
+- Buka dialog dari tombol **SCADA MQTT** di ribbon.
+- Tombol **Save** menyimpan pengaturan ke project JSON, di field `doc.pluginSettings["system.mqttScada"]`.
+- Tombol **Test** hanya mengetes koneksi (connect/timeout).
+
+Catatan:
+- Default event publish menggunakan topic `default/events`; plugin akan memetakan ini ke `defaultEventTopic` (mis. `scada/events`).
+
+### Format message remote control
+Message payload adalah JSON:
+
+```json
+{ "action": "updateElement", "payload": { "id": "rect_123", "patch": { "x": 100, "y": 120 } } }
+```
+
+Action yang didukung saat ini:
+- `select` { ids: string[], append?: boolean }
+- `clearSelection`
+- `setTool` { tool: string }
+- `setViewMode` { value: boolean }
+- `setZoom` { scale?: number, panX?: number, panY?: number }
+- `setCanvas` { width?, height?, background?, gridEnabled?, gridSize?, snapToGrid? }
+- `createElement` { input: CreateElementInput }
+- `updateElement` { id: string, patch: Partial<DesignerElement> }
+- `deleteElements` { ids: string[] }
+- `translate` { ids: string[], dx: number, dy: number }
+- `bringToFront` { ids: string[] }
+- `groupSelection`
+- `ungroupSelection`
+
+---
+
 ## Struktur folder yang direkomendasikan
 
 Ini struktur yang enak dipelihara (bisa kamu adopsi pelan-pelan):

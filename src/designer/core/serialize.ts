@@ -16,6 +16,11 @@ export function importDocument(jsonText: string): DesignerDocument {
   if (typeof canvas.snapToGrid !== "boolean") {
     (parsed.canvas as CanvasSettings).snapToGrid = false;
   }
+
+  if (!parsed.pluginSettings || typeof parsed.pluginSettings !== "object") {
+    (parsed as DesignerDocument).pluginSettings = {};
+  }
+
   return parsed;
 }
 

@@ -20,7 +20,7 @@ Kufayeka Visual Designer menggunakan arsitektur modular dengan komponen-komponen
 
 - **DesignerEngine**: State management dan operasi dasar
 - **DesignerAPI**: Interface publik untuk manipulasi designer
-- **DesignerRegistry**: Registry untuk UI contributions (ribbon, properties)
+- **DesignerRegistry**: Registry untuk UI contributions (top panel, panels, dialogs, popups, canvas overlays)
 - **ElementRegistry**: Registry untuk custom elements
 - **PluginManager**: Manager untuk aktivasi dan deaktivasi plugin
 - **DesignerHost**: Container utama yang menggabungkan semua komponen
@@ -167,7 +167,85 @@ api.publishEvent("myapp/events", {
 
 ## 🎨 UI Contributions (Registry)
 
-### Ribbon Actions
+Mulai January 2026, kontribusi UI disarankan lewat **View APIs** yang baku di `DesignerRegistry`:
+
+- `registry.topPanelViewAPI()`
+- `registry.leftPanelViewAPI()`
+- `registry.rightPanelViewAPI()`
+- `registry.bottomPanelViewAPI()`
+- `registry.dialogViewAPI()`
+- `registry.popUpViewAPI()`
+- `registry.canvasViewAPI()`
+
+Tujuannya supaya struktur UI tidak drift: semua fitur/tombol/panel wajib “register” ke slot yang jelas.
+
+> Legacy API (`registerRibbonAction`) masih didukung, tapi sebaiknya pakai top panel API.
+
+### Top Panel (Recommended)
+
+Tambahkan item di top panel (ribbon slot):
+
+```ts
+const dispose = registry.topPanelViewAPI().registerItem({
+  kind: "button",
+  id: "my-plugin.tool.open",
+  placement: "right",
+  order: 10,
+  label: "My Tool",
+  onClick: () => {
+    registry.dialogViewAPI().open("my-plugin.dialog");
+  },
+});
+
+return dispose;
+```
+
+### Dialog Tool (Recommended)
+
+```ts
+const dispose = registry.dialogViewAPI().registerDialog({
+  id: "my-plugin.dialog",
+  title: "My Dialog",
+  render: (ctx) => {
+    // ctx = { engine, state, api, host, dialog }
+    return "...";
+  },
+});
+
+return dispose;
+```
+
+### PopUp Tool (Recommended)
+
+```ts
+const dispose = registry.popUpViewAPI().registerPopup({
+  id: "my-plugin.popup",
+  title: "My Popup",
+  render: (ctx) => "...",
+});
+
+// open somewhere:
+registry.popUpViewAPI().open("my-plugin.popup", { anyProps: true });
+
+return dispose;
+```
+
+### Canvas Overlay (Recommended)
+
+Canvas overlay adalah UI yang “nempel” di area canvas (HUD/tools/indicators) tanpa harus edit `SvgCanvas`.
+
+```ts
+const dispose = registry.canvasViewAPI().registerOverlayItem({
+  id: "my-plugin.canvas.hud",
+  order: 10,
+  render: (ctx) => {
+    // ctx = { engine, state, api, host }
+    return "...";
+  },
+});
+```
+
+### Ribbon Actions (Legacy)
 
 Tambahkan tombol ke ribbon toolbar:
 

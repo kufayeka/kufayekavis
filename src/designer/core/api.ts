@@ -15,6 +15,13 @@ export type DesignerAPI = {
   setTool: (tool: ToolType) => void;
   setViewMode: (v: boolean) => void;
 
+  // canvas
+  setCanvas: (patch: Partial<DesignerDocument["canvas"]>) => void;
+
+  // plugin settings (stored in project JSON, excluded from history)
+  getPluginSettings: (pluginId: string) => unknown;
+  setPluginSettings: (pluginId: string, value: unknown) => void;
+
   // selection
   select: (ids: ElementId[], opts?: { append?: boolean }) => void;
   clearSelection: () => void;
@@ -59,6 +66,11 @@ export function createDesignerAPI(engine: DesignerEngine, elements: ElementRegis
 
     setTool: (tool) => engine.setTool(tool),
     setViewMode: (v) => engine.setViewMode(v),
+
+    setCanvas: (patch) => engine.setCanvas(patch),
+
+    getPluginSettings: (pluginId) => engine.getPluginSettings(pluginId),
+    setPluginSettings: (pluginId, value) => engine.setPluginSettings(pluginId, value),
 
     select: (ids, opts) => engine.select(ids, opts),
     clearSelection: () => engine.clearSelection(),
