@@ -1,5 +1,4 @@
 import type { ElementDefinition } from "../../designer/core/elements";
-import type { CustomElement } from "../../designer/core/types";
 import { exportWebEmbedSvg, renderWebEmbed } from "./webEmbed.render";
 import { webEmbedActions } from "./webEmbed.actions";
 

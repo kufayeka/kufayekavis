@@ -19,6 +19,8 @@ import { numericDisplayElementDefinition } from "../../elements/numericDisplay/n
 import { renderNumericDisplayProperties } from "../../elements/numericDisplay/numericDisplay.properties";
 import { webEmbedElementDefinition } from "../../elements/webEmbed/webEmbed.definition";
 import { renderWebEmbedProperties } from "../../elements/webEmbed/webEmbed.properties";
+import { motionPathLineElementDefinition } from "../../elements/motionPathLine/motionPathLine.definition";
+import { renderMotionPathLineProperties } from "../../elements/motionPathLine/motionPathLine.properties";
 import { registerBuiltInUiContributions } from "../ui/components/builtins/registerBuiltInUi";
 
 export const builtInUiPlugin: DesignerPlugin = {
@@ -139,8 +141,21 @@ export const webEmbedPlugin: DesignerPlugin = {
   },
 };
 
+export const motionPathLinePlugin: DesignerPlugin = {
+  id: "builtin.element.motionPathLine",
+  activate: (ctx) => {
+    const host = ctx.host;
+    if (!host) return;
+    return [
+      host.elements.register(motionPathLineElementDefinition),
+      host.registry.registerPropertiesSection({ id: "builtin.props.motionPathLine", render: renderMotionPathLineProperties }),
+    ];
+  },
+};
+
 export const builtInElementPlugins: readonly DesignerPlugin[] = [
   ...builtInPalettePlugins,
   numericDisplayPlugin,
   webEmbedPlugin,
+  motionPathLinePlugin,
 ];

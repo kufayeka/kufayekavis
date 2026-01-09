@@ -15,6 +15,7 @@ import type { DragMode } from "./svgCanvas/dragTypes";
 import { MagnifierOverlay, SelectionOverlay } from "./svgCanvas/overlays";
 import { RenderTree } from "./svgCanvas/renderTree";
 import { fileToDataUrl, loadImageSize, pointsToPath, rotateDelta } from "./svgCanvas/utils";
+import { MOTION_PATH_LINE_KIND, patchMotionPathLineEndpoint } from "../../../elements/motionPathLine/motionPathLine.model";
 
 export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: DesignerState }) {
   const host = useDesignerHost();
@@ -279,8 +280,23 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       if (drag.kind === "line-end") {
         const p = clientToCanvas(e.clientX, e.clientY);
         const sp = snapIfEnabled(p.x, p.y);
-        const patch = drag.end === "p1" ? { x1: sp.x, y1: sp.y } : { x2: sp.x, y2: sp.y };
-        engine.updateElement(drag.id, patch);
+        const cur = engine.getState().doc.elements[drag.id];
+        if (!cur) return;
+
+        if (cur.type === "line") {
+          const patch = drag.end === "p1" ? { x1: sp.x, y1: sp.y } : { x2: sp.x, y2: sp.y };
+          engine.updateElement(drag.id, patch);
+          return;
+        }
+
+        if (cur.type === "custom" && cur.kind === MOTION_PATH_LINE_KIND) {
+          // Convert canvas coord -> local element coord
+          const nextLocal = { x: sp.x - cur.x, y: sp.y - cur.y };
+          const patch = patchMotionPathLineEndpoint({ el: cur, end: drag.end, nextLocal });
+          engine.updateElement(drag.id, patch as unknown as Partial<DesignerElement>);
+          return;
+        }
+
         return;
       }
 

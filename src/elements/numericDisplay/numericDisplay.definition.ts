@@ -1,5 +1,4 @@
 import type { ElementDefinition } from "../../designer/core/elements";
-import type { CustomElement } from "../../designer/core/types";
 import { exportNumericDisplaySvg, renderNumericDisplay } from "./numericDisplay.render";
 import { numericDisplayActions } from "./numericDisplay.actions";
 

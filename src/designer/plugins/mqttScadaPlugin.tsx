@@ -78,6 +78,69 @@ function applyRemoteControlCommand(
   publishResponse?: (payload: unknown) => void,
 ) {
 
+  const CUSTOM_ELEMENT_ROOT_KEYS = new Set<string>([
+    "id",
+    "type",
+    "kind",
+    "name",
+    "locked",
+    "hidden",
+    "parentId",
+    "zIndex",
+    "rotation",
+    "flipH",
+    "flipV",
+    "opacity",
+    "stroke",
+    "strokeWidth",
+    "fill",
+    "enableOnMouseHoverEventListener",
+    "enableOnMouseClickEventListener",
+    "enableOnMouseLeaveEventListener",
+    "mqttTopic",
+    "x",
+    "y",
+    "width",
+    "height",
+    "props",
+  ]);
+
+  const splitCustomElementPatch = (patch: Record<string, unknown>) => {
+    const elementPatch: Record<string, unknown> = {};
+    const propsPatch: Record<string, unknown> = {};
+
+    for (const [k, v] of Object.entries(patch)) {
+      if (k === "props") {
+        if (v && typeof v === "object" && !Array.isArray(v)) {
+          Object.assign(propsPatch, v as Record<string, unknown>);
+        }
+        continue;
+      }
+
+      if (CUSTOM_ELEMENT_ROOT_KEYS.has(k)) elementPatch[k] = v;
+      else propsPatch[k] = v;
+    }
+
+    return { elementPatch, propsPatch };
+  };
+
+  const applySmartPatch = (id: string, patch: Record<string, unknown>) => {
+    const current = api.getElement(id);
+    if (!current || current.type !== "custom") {
+      api.updateElement(id, patch as Partial<DesignerElement>);
+      return;
+    }
+
+    const { elementPatch, propsPatch } = splitCustomElementPatch(patch);
+    api.engine.beginHistoryBatch();
+    try {
+      if (Object.keys(elementPatch).length > 0) api.updateElement(id, elementPatch as Partial<DesignerElement>);
+      if (Object.keys(propsPatch).length > 0) api.updateCustomProps(id, propsPatch);
+    } finally {
+      api.engine.endHistoryBatch();
+    }
+  };
+
   const envelopeSchema = z.object({
     action: z.string().min(1),
     payload: z.unknown().optional(),
@@ -267,13 +330,13 @@ function applyRemoteControlCommand(
       if (!parsed.success) return;
       if (!parsed.data.input || typeof parsed.data.input !== "object") return;
       const id = api.createElement(parsed.data.input as CreateElementInput);
-      if (parsed.data.patch && typeof parsed.data.patch === "object") api.updateElement(id, parsed.data.patch as Partial<DesignerElement>);
+      if (parsed.data.patch && typeof parsed.data.patch === "object") applySmartPatch(id, parsed.data.patch as Record<string, unknown>);
       respond({ type: "createElement", ok: true, id });
     })
     .with("updateElement", () => {
       const parsed = z.object({ id: z.string().min(1), patch: z.record(z.string(), z.unknown()) }).safeParse(payload);
       if (!parsed.success) return;
-      api.updateElement(parsed.data.id, parsed.data.patch as Partial<DesignerElement>);
+      applySmartPatch(parsed.data.id, parsed.data.patch);
     })
     .with("bulkUpdateElements", () => {
       const parsed = z
@@ -288,7 +351,7 @@ function applyRemoteControlCommand(
       api.engine.beginHistoryBatch();
       try {
         for (const u of parsed.data.updates) {
-          api.updateElement(u.id, u.patch as Partial<DesignerElement>);
+          applySmartPatch(u.id, u.patch);
         }
       } finally {
         api.engine.endHistoryBatch();

@@ -4,6 +4,7 @@ import { gsap } from "gsap";
 import type { DesignerState } from "../../../core/engine";
 import { getBBoxCenter } from "../../../core/geometry";
 import type { DragMode } from "./dragTypes";
+ import { MOTION_PATH_LINE_KIND, coerceMotionPathLineProps } from "../../../../elements/motionPathLine/motionPathLine.model";
 
 export function SelectionOverlay({
   box,
@@ -22,6 +23,8 @@ export function SelectionOverlay({
 }) {
   const singleId = state.selection.ids.length === 1 ? state.selection.ids[0] : null;
   const single = singleId ? state.doc.elements[singleId] : null;
+
+  const isMotionPathLine = single?.type === "custom" && single.kind === MOTION_PATH_LINE_KIND;
 
   const stroke = "var(--foreground)";
 
@@ -70,7 +73,7 @@ export function SelectionOverlay({
     <g className="designer-selection" pointerEvents="none" opacity={0.9} transform={overlayTransform}>
       <rect x={box.x} y={box.y} width={box.width} height={box.height} fill="none" stroke={stroke} strokeWidth={1} />
 
-      {single && (single.type === "rect" || single.type === "image" || single.type === "text" || single.type === "custom") && (
+      {single && (single.type === "rect" || single.type === "image" || single.type === "text" || (single.type === "custom" && !isMotionPathLine)) && (
         <>
           <Handle
             x={box.x}
@@ -360,6 +363,36 @@ export function SelectionOverlay({
               onStartLineEnd({ kind: "line-end", id: single.id, end: "p2" });
             }}
           />
+        </>
+      )}
+
+      {single && single.type === "custom" && single.kind === MOTION_PATH_LINE_KIND && (
+        <>
+          {(() => {
+            const p = coerceMotionPathLineProps(single.props);
+            return (
+              <>
+                <Handle
+                  x={single.x + p.x1}
+                  y={single.y + p.y1}
+                  cursor="crosshair"
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onStartLineEnd({ kind: "line-end", id: single.id, end: "p1" });
+                  }}
+                />
+                <Handle
+                  x={single.x + p.x2}
+                  y={single.y + p.y2}
+                  cursor="crosshair"
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    onStartLineEnd({ kind: "line-end", id: single.id, end: "p2" });
+                  }}
+                />
+              </>
+            );
+          })()}
         </>
       )}
 
