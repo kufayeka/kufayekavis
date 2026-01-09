@@ -245,6 +245,109 @@ Catatan:
 
 Catatan:
 - Patch langsung masuk ke `api.updateElement(id, patch)`.
+- `patch` BUKAN hanya untuk text/x/y. Kamu bisa set **SEMUA** properti element (native maupun custom via `props`).
+
+---
+
+## FULL element properties (native + plugin/custom)
+
+Semua element mengikuti union type `DesignerElement` di [src/designer/core/types.ts](src/designer/core/types.ts).
+
+### BaseElement (semua type)
+
+Properti yang selalu ada:
+
+- `id` (string)
+- `type` ("rect" | "circle" | "line" | "free" | "image" | "text" | "custom" | "group")
+- `name?` (string)
+- `locked?` (boolean)
+- `hidden?` (boolean)
+- `parentId?` (string) — id group parent
+- `zIndex` (number)
+- `rotation` (number, degree)
+- `flipH?` (boolean)
+- `flipV?` (boolean)
+- `opacity` (number 0..1)
+- `stroke` (string)
+- `strokeWidth` (number)
+- `fill` (string)
+
+Event + MQTT:
+- `enableOnMouseHoverEventListener?` (boolean)
+- `enableOnMouseClickEventListener?` (boolean)
+- `enableOnMouseLeaveEventListener?` (boolean)
+- `mqttTopic?` (string)
+
+### RectElement
+- `x`, `y`, `width`, `height` (number)
+- `rx`, `ry` (number)
+
+### CircleElement
+- `cx`, `cy`, `r` (number)
+
+### LineElement
+- `x1`, `y1`, `x2`, `y2` (number)
+
+### FreeDrawElement
+- `d` (string) — SVG path d
+
+### ImageElement
+- `x`, `y`, `width`, `height` (number)
+- `href` (string)
+- `preserveAspectRatio` (string)
+- `fit?` ("none" | "contain" | "cover" | "stretch")
+- `naturalWidth?`, `naturalHeight?` (number)
+
+### TextElement
+- `x`, `y` (number)
+- `text` (string)
+- `fontSize` (number)
+- `fontWeight` (string)
+- `fontStyle?` ("normal" | "italic")
+- `textDecoration?` ("none" | "underline" | "line-through")
+- `fill` (string) — warna text
+
+### GroupElement
+- `childIds` (string[])
+
+### CustomElement (plugin element)
+- `kind` (string)
+- `x`, `y`, `width`, `height` (number)
+- `props` (object) — **semua** customisability plugin element ada di sini
+
+Contoh update TEXT (bukan cuma x/y/text):
+
+```json
+{
+  "action": "updateElement",
+  "payload": {
+    "id": "text_1",
+    "patch": {
+      "text": "ALARM!",
+      "fontSize": 42,
+      "fontWeight": "bold",
+      "fontStyle": "italic",
+      "textDecoration": "underline",
+      "fill": "#ff0000",
+      "rotation": 15,
+      "opacity": 0.9,
+      "zIndex": 999,
+      "locked": false,
+      "enableOnMouseClickEventListener": true,
+      "mqttTopic": "scada/events/alarms"
+    }
+  }
+}
+```
+
+Contoh update CUSTOM element props (plugin element):
+
+```json
+{
+  "action": "updateCustomProps",
+  "payload": { "id": "custom_1", "patch": { "value": 123, "unit": "bar" } }
+}
+```
 
 ### 7) Delete elements
 
@@ -302,6 +405,34 @@ Catatan:
     ```
 
 ### 13) Export / Import project JSON
+- `bulkUpdateElements`
+  - Untuk update banyak element sekaligus (lebih enak untuk SCADA).
+  - payload:
+    ```json
+    {
+      "updates": [
+        { "id": "rect_1", "patch": { "x": 10, "y": 20, "fill": "#00ff00" } },
+        { "id": "circle_2", "patch": { "opacity": 0.3, "locked": true } }
+      ]
+    }
+    ```
+
+---
+
+## FULL UI control (shell)
+
+Remote control juga bisa ngontrol shell UI (panel kiri/kanan + Focus Canvas mode) via `DesignerRegistry`.
+
+- `getUiLayout` (response)
+- `setUiLayout`
+  - payload:
+    ```json
+    { "leftPanelVisible": true, "rightPanelVisible": false, "focusCanvas": false }
+    ```
+- `toggleLeftPanel`
+- `toggleRightPanel`
+- `toggleFocusCanvas`
+
 
 - `exportProjectJson`
   - payload: `{}`

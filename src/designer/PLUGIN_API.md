@@ -301,7 +301,7 @@ return disposeSection;
 ```typescript
 import type { DesignerPlugin } from "../core/plugins";
 
-export const MyPlugin: DesignerPlugin = {
+export const ExamplePlugin: DesignerPlugin = {
   id: "my-plugin",
   activate: ({ api, registry, elements }) => {
     const disposers: Array<() => void> = [];
@@ -340,11 +340,11 @@ export const MyPlugin: DesignerPlugin = {
 // Di aplikasi utama (DesignerApp.tsx): host membuat PluginManager,
 // tapi plugin TIDAK auto-aktif. Kamu harus register + activate.
 
-host.plugins.register(MyPlugin);
+host.plugins.register(ExamplePlugin);
 host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements });
 
 // Register plugin
-host.plugins.register(MyPlugin);
+host.plugins.register(ExamplePlugin);
 
 // Activate plugin
 host.plugins.activateAll({

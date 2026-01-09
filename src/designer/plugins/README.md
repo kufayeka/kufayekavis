@@ -43,22 +43,22 @@ Penting: “ada 2 return” itu **normal** karena beda scope:
 - `activate()` return array `disposers` (cleanup)
 - `render()` return UI (ReactNode/JSX)
 
-Buat file baru misalnya `src/designer/plugins/myPlugin.tsx`:
+Buat file baru misalnya `src/designer/plugins/examplePlugin.tsx`:
 
 ```tsx
 import type { DesignerPlugin } from "../core/plugins";
 import type { DesignerAPI } from "../core/api";
 import type { DesignerState } from "../core/engine";
 
-export const myPlugin: DesignerPlugin = {
-  id: "my.myPlugin",
+export const examplePlugin: DesignerPlugin = {
+  id: "example.plugin",
   activate: ({ api, registry, elements }) => {
     const disposers: Array<() => void> = [];
 
     // 1) Tambah tombol di Ribbon (legacy)
     disposers.push(
       registry.registerRibbonAction({
-        id: "my.myPlugin.hello",
+        id: "example.plugin.hello",
         label: "Hello",
         onClick: () => {
           // api.engine juga ada kalau butuh
@@ -70,7 +70,7 @@ export const myPlugin: DesignerPlugin = {
     // 2) Tambah section di Properties > Plugins
     disposers.push(
       registry.registerPropertiesSection({
-        id: "my.myPlugin.section",
+        id: "example.plugin.section",
         render: (ctx: unknown) => {
           const { state } = ctx as { api: DesignerAPI; state: DesignerState };
           return (
@@ -103,7 +103,7 @@ Contoh top ribbon button + dialog tool:
 ```ts
 disposers.push(
   registry.registerDialog({
-    id: "my.myPlugin.dialog",
+    id: "example.plugin.dialog",
     title: "My Tool",
     render: (ctx: unknown) => {
       // ctx punya { engine, state, api, host, dialog }
@@ -115,11 +115,11 @@ disposers.push(
 disposers.push(
   registry.registerTopRibbonItem({
     kind: "button",
-    id: "my.myPlugin.openDialog",
+    id: "example.plugin.openDialog",
     placement: "right",
     order: 5,
     label: "My Tool",
-    onClick: () => registry.openDialog("my.myPlugin.dialog"),
+    onClick: () => registry.openDialog("example.plugin.dialog"),
   }),
 );
 ```
@@ -137,10 +137,10 @@ Di file itu:
 Contoh:
 
 ```ts
-import { myPlugin } from "../../plugins/myPlugin";
+import { examplePlugin } from "../../plugins/examplePlugin";
 
 // setelah host dibuat
-const dispose = host.plugins.register(myPlugin);
+const dispose = host.plugins.register(examplePlugin);
 host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements });
 
 // saat unmount
@@ -242,7 +242,7 @@ Ini struktur yang enak dipelihara (bisa kamu adopsi pelan-pelan):
 ```
 src/designer/plugins/
   README.md
-  myPlugin.tsx
+  examplePlugin.tsx
   runtime/
     mqttBridge.ts
 src/elements/
@@ -439,6 +439,6 @@ Dengan cara ini, kamu tidak perlu mengubah element renderer sama sekali.
 
 ## Contoh yang sudah ada di repo
 
-- Plugin TSX example: `src/designer/plugins/myPlugin.tsx`
+- Plugin TSX example: `src/designer/plugins/examplePlugin.tsx`
 - Plugin TS (tanpa JSX) example: `src/designer/plugins/testPropertiesPanel.ts`
 - Custom element example: `src/elements/numericDisplay/*`

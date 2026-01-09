@@ -8,6 +8,7 @@ import type { DesignerPlugin } from "../core/plugins";
 import type { DesignerAPI } from "../core/api";
 import type { CreateElementInput } from "../core/engine";
 import type { DesignerElement } from "../core/types";
+import type { DesignerRegistry, UiLayoutState } from "../core/registry";
 
 type MqttScadaSettings = {
   url: string; // ws(s)://host:port/mqtt
@@ -72,12 +73,21 @@ function publishJson(client: MqttClient, topic: string, payload: unknown) {
   client.publish(topic, JSON.stringify(payload));
 }
 
-function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown, publishResponse?: (payload: unknown) => void) {
+function applyRemoteControlCommand(
+  api: DesignerAPI,
+  registry: DesignerRegistry | null,
+  cmd: unknown,
+  publishResponse?: (payload: unknown) => void,
+) {
   if (!cmd || typeof cmd !== "object") return;
   const o = cmd as Record<string, unknown>;
   const action = String(o.action ?? "");
   const payload = (o.payload ?? {}) as Record<string, unknown>;
   const requestId = typeof o.requestId === "string" ? o.requestId : undefined;
+
+  const respond = (p: Record<string, unknown>) => {
+    publishResponse?.({ requestId, ...p });
+  };
 
   if (action === "select") {
     const ids = Array.isArray(payload.ids) ? (payload.ids.filter((x) => typeof x === "string") as string[]) : [];
@@ -119,14 +129,100 @@ function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown, publishRespon
     return;
   }
 
+  if (action === "getDocument") {
+    respond({ type: "getDocument", ok: true, doc: api.getDocument() });
+    return;
+  }
+
+  if (action === "listElements") {
+    const doc = api.getDocument();
+    respond({
+      type: "listElements",
+      ok: true,
+      rootIds: doc.rootIds,
+      ids: Object.keys(doc.elements),
+    });
+    return;
+  }
+
+  if (action === "getElement") {
+    const id = String(payload.id ?? "");
+    const el = id ? api.getElement(id) : undefined;
+    respond({ type: "getElement", ok: Boolean(el), element: el ?? null });
+    return;
+  }
+
+  if (action === "getPluginSettings") {
+    const pluginId = String(payload.pluginId ?? "");
+    if (!pluginId) {
+      respond({ type: "getPluginSettings", ok: false, error: "pluginId is required" });
+      return;
+    }
+    respond({ type: "getPluginSettings", ok: true, pluginId, value: api.getPluginSettings(pluginId) });
+    return;
+  }
+
+  if (action === "setPluginSettings") {
+    const pluginId = String(payload.pluginId ?? "");
+    if (!pluginId) return;
+    api.setPluginSettings(pluginId, payload.value);
+    respond({ type: "setPluginSettings", ok: true, pluginId });
+    return;
+  }
+
+  if (action === "patchPluginSettings") {
+    const pluginId = String(payload.pluginId ?? "");
+    const patch = payload.patch;
+    if (!pluginId) return;
+    if (!patch || typeof patch !== "object") return;
+    const cur = api.getPluginSettings(pluginId);
+    const curObj = cur && typeof cur === "object" ? (cur as Record<string, unknown>) : {};
+    api.setPluginSettings(pluginId, { ...curObj, ...(patch as Record<string, unknown>) });
+    respond({ type: "patchPluginSettings", ok: true, pluginId });
+    return;
+  }
+
+  if (action === "getUiLayout") {
+    if (!registry) {
+      respond({ type: "getUiLayout", ok: false, error: "registry not available" });
+      return;
+    }
+    respond({ type: "getUiLayout", ok: true, layout: registry.getUiLayout() });
+    return;
+  }
+
+  if (action === "setUiLayout") {
+    if (!registry) return;
+    const p = payload as Partial<UiLayoutState>;
+    registry.setUiLayout({
+      ...(typeof p.leftPanelVisible === "boolean" ? { leftPanelVisible: p.leftPanelVisible } : null),
+      ...(typeof p.rightPanelVisible === "boolean" ? { rightPanelVisible: p.rightPanelVisible } : null),
+      ...(typeof p.focusCanvas === "boolean" ? { focusCanvas: p.focusCanvas } : null),
+    });
+    return;
+  }
+
+  if (action === "toggleLeftPanel") {
+    if (!registry) return;
+    registry.toggleLeftPanel();
+    return;
+  }
+
+  if (action === "toggleRightPanel") {
+    if (!registry) return;
+    registry.toggleRightPanel();
+    return;
+  }
+
+  if (action === "toggleFocusCanvas") {
+    if (!registry) return;
+    registry.toggleFocusCanvas();
+    return;
+  }
+
   if (action === "exportProjectJson") {
     const json = api.exportProjectJson();
-    publishResponse?.({
-      type: "exportProjectJson",
-      requestId,
-      ok: true,
-      json,
-    });
+    respond({ type: "exportProjectJson", ok: true, json });
     return;
   }
 
@@ -141,9 +237,9 @@ function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown, publishRespon
       } else {
         throw new Error("jsonText or doc is required");
       }
-      publishResponse?.({ type: "importProjectJson", requestId, ok: true });
+      respond({ type: "importProjectJson", ok: true });
     } catch (err) {
-      publishResponse?.({ type: "importProjectJson", requestId, ok: false, error: err instanceof Error ? err.message : String(err) });
+      respond({ type: "importProjectJson", ok: false, error: err instanceof Error ? err.message : String(err) });
     }
     return;
   }
@@ -156,8 +252,11 @@ function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown, publishRespon
 
   if (action === "createElement") {
     const input = payload.input as unknown;
+    const patch = payload.patch as unknown;
     if (input && typeof input === "object") {
-      api.createElement(input as CreateElementInput);
+      const id = api.createElement(input as CreateElementInput);
+      if (patch && typeof patch === "object") api.updateElement(id, patch as Partial<DesignerElement>);
+      respond({ type: "createElement", ok: true, id });
     }
     return;
   }
@@ -166,6 +265,26 @@ function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown, publishRespon
     const id = String(payload.id ?? "");
     const patch = payload.patch as unknown;
     if (id && patch && typeof patch === "object") api.updateElement(id, patch as Partial<DesignerElement>);
+    return;
+  }
+
+  if (action === "bulkUpdateElements") {
+    const updates = Array.isArray(payload.updates) ? payload.updates : [];
+    if (updates.length === 0) return;
+    api.engine.beginHistoryBatch();
+    try {
+      for (const u of updates) {
+        if (!u || typeof u !== "object") continue;
+        const ur = u as Record<string, unknown>;
+        const id = typeof ur.id === "string" ? ur.id : "";
+        const patch = ur.patch;
+        if (!id) continue;
+        if (!patch || typeof patch !== "object") continue;
+        api.updateElement(id, patch as Partial<DesignerElement>);
+      }
+    } finally {
+      api.engine.endHistoryBatch();
+    }
     return;
   }
 
@@ -183,9 +302,9 @@ function applyRemoteControlCommand(api: DesignerAPI, cmd: unknown, publishRespon
     if (!id || !actionId) return;
     try {
       const result = api.callElementAction(id, actionId, ...args);
-      publishResponse?.({ type: "callElementAction", requestId, ok: true, result });
+      respond({ type: "callElementAction", ok: true, result });
     } catch (err) {
-      publishResponse?.({ type: "callElementAction", requestId, ok: false, error: err instanceof Error ? err.message : String(err) });
+      respond({ type: "callElementAction", ok: false, error: err instanceof Error ? err.message : String(err) });
     }
     return;
   }
@@ -233,7 +352,7 @@ function buildClientOptions(s: MqttScadaSettings): IClientOptions {
   return opts;
 }
 
-function createConnectionManager(api: DesignerAPI) {
+function createConnectionManager(api: DesignerAPI, registry?: DesignerRegistry) {
   let client: MqttClient | null = null;
   let currentUrl = "";
   let currentOptsJson = "";
@@ -286,7 +405,7 @@ function createConnectionManager(api: DesignerAPI) {
 
         const text = payload.toString("utf8");
         const parsed = jsonSafeParse(text);
-        applyRemoteControlCommand(api, parsed, publishResponse);
+        applyRemoteControlCommand(api, registry ?? null, parsed, publishResponse);
       });
 
       client.on("connect", () => {
@@ -580,7 +699,7 @@ function SettingsDialog({ api }: { api: DesignerAPI }) {
 export const mqttScadaPlugin: DesignerPlugin = {
   id: PLUGIN_ID,
   activate: ({ api, registry }) => {
-    const mgr = createConnectionManager(api);
+    const mgr = createConnectionManager(api, registry);
 
     // Replace API publishEvent so ALL elements/canvas use MQTT when plugin is configured.
     const originalPublishEvent = api.publishEvent;
