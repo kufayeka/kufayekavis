@@ -2,9 +2,8 @@ import type { ElementDefinition } from "../elements";
 
 export function getBuiltInElementDefinitions(): ElementDefinition[] {
   // NOTE: this file is kept for backward compatibility.
-  // The source of truth for built-ins is now `createBuiltInElementRegistry()`.
-  // We define the same built-in definitions inline so this module doesn't rely
-  // on missing per-element files.
+  // The source of truth for built-in palette definitions is now the built-in palette plugins (see `builtInPalettePlugins`).
+  // We keep these definitions inline so older imports of this module still work.
   return [
     {
       id: "rect",

@@ -391,8 +391,17 @@ export const myElementDefinition: ElementDefinition = {
 
   // Render function untuk SVG canvas
   render: (ctx) => {
+    // Model A: render() hanya menggambar “inner visuals”.
+    // Jangan attach handler/ref/MQTT di sini. Itu tugas renderer (RenderTree).
     const { element } = ctx;
-    const el = element as any;
+    const el = element as {
+      width: number;
+      height: number;
+      fill: string;
+      stroke: string;
+      strokeWidth: number;
+      props?: Record<string, unknown>;
+    };
 
     return (
       <g>
@@ -440,6 +449,152 @@ export const myElementDefinition: ElementDefinition = {
   }
 };
 ```
+
+### Render Pipeline & Single Source of Truth (Guideline)
+
+Kalau targetmu adalah: **"buat file code → definisikan → register"** tanpa patch di banyak tempat, maka aturan bakunya perlu jelas.
+
+Di Kufayeka, ada 2 kategori element:
+
+1) **Native elements** (`rect/circle/line/free/image/text/...`) → datanya langsung di canvas coordinate
+2) **Custom elements** (`type: "custom"`) → biasanya box-based dan render di dalam wrapper `svg` (viewBox lokal)
+
+Supaya rapi dan maintainable, pakai prinsip ini:
+
+- `ElementDefinition` adalah **Single Source of Truth untuk “apa itu element”**: palette + createInput + render + export + actions.
+- `RenderTree` adalah **Single Source of Truth untuk “wiring lintas element”**: ref registration, `data-el-id`, cursor/selection targeting, dan publish event MQTT.
+
+Dengan begitu: definition fokus ke *visual* + behavior spesifik, sementara hal umum tidak diduplikasi.
+
+#### Kontrak render (recommended)
+
+Ada 2 model yang mungkin. Pilih salah satu dan jadikan standar tim.
+
+**Model A — Definition hanya return “inner visuals” (recommended untuk konsistensi)**
+
+- `definition.render(ctx)` hanya menggambar bentuknya.
+- Tidak menempelkan event handler, tidak publish event, tidak akses DOM refs.
+- Transform/opacity/event wiring dipasang oleh renderer (mis. `RenderTree`) secara seragam.
+
+**Kelebihan**
+- Paling “aturan baku”: semua element dapat wiring yang sama.
+- Kecil risiko ada element yang lupa pasang handler/ref atau beda perilaku.
+- Mudah ganti kebijakan global (mis. event publish, data attributes) tanpa edit semua element.
+
+**Kekurangan**
+- Renderer harus cukup kuat untuk menerapkan transform/opacity secara generic.
+- Kalau ada element yang butuh perilaku render khusus (contoh: nested SVG yang tricky), kamu butuh escape hatch yang jelas.
+
+**Model B — Definition bertanggung jawab atas semuanya (flexibility tinggi, tapi rawan drift)**
+
+- `definition.render(ctx)` menggambar sekaligus memasang transform/opacity/handler/wiring.
+
+**Kelebihan**
+- Sangat fleksibel untuk elemen yang unik.
+- Renderer bisa tetap tipis.
+
+**Kekurangan / what could go wrong**
+- High risk kode “drift”: ada element lupa pasang `data-el-id`, lupa register ref, beda event behavior.
+- Double transform/opacity (mis. renderer juga apply transform) → bug yang susah dilacak.
+- Sulit enforce konsistensi tanpa review ketat + lint rules.
+
+#### Rule of thumb (biar tidak jadi bencana)
+
+Kalau kamu ingin sistem “proven” dan scalable:
+
+- Gunakan **Model A** sebagai default.
+- Sediakan **escape hatch** untuk kasus spesial (mis. `definition.renderMode = "selfManaged"` atau `definition.renderWithWrapper = true`) — tapi batasi pemakaiannya.
+
+#### Hal yang HARUS dihindari di `render(ctx)`
+
+- Side effects: jangan `api.update...`, jangan publish MQTT, jangan mutate state.
+- Jangan melakukan random / time-based output (kecuali memang intentional) → bikin undo/redo dan preview sulit stabil.
+- Jangan mengandalkan DOM query/ref di render.
+
+#### Coordinate system guideline
+
+ **Custom elements**: render di coordinate lokal (0..width/height) karena dimasukkan ke wrapper `svg` dengan `viewBox` lokal.
+ **Native elements**: render di canvas coordinate (x/y/cx/cy) karena mereka langsung ada di root SVG canvas.
+
+#### Bagaimana sistem merender element (Model A)
+
+Secara ringkas, pipeline render yang berjalan adalah:
+
+1) **Registry lookup**: renderer mengambil `ElementDefinition` dari `ElementRegistry` berdasarkan `el.type` (atau `custom:${kind}`).
+2) **Inner visuals**: `definition.render(ctx)` dipanggil dan harus mengembalikan React node (SVG elements) tanpa side effect.
+3) **Wiring layer (single place)**: `RenderTree` memasang hal lintas element:
+  - `ref` registration (supaya drag/selection bisa bekerja)
+  - `data-el-id`
+  - `opacity` + `transform` (flip/rotate) secara konsisten
+  - publish event MQTT (`onMouseEnter/onClick/onMouseLeave`) secara konsisten
+
+> Catatan penting: Karena wiring dipasang di wrapper, `definition.render` tidak boleh mencoba meng-attach handler/ref/transform sendiri.
+
+### Element “Ingredients” (Checklist)
+
+Kalau kamu ingin workflow yang baku (buat file → definisikan → register), minimal ingredient untuk element adalah:
+
+1) **Definition file** (`*.definition.ts`)
+  - `id`, `type` (+ `kind` untuk custom)
+  - `label`, `palette` (kalau mau muncul di palette)
+  - `createInput(pt)` (supaya bisa dibuat dari palette)
+  - `render(ctx)` (Model A: inner visuals only)
+  - optional: `exportSvg(ctx)`, `actions`
+
+2) **Render file** (`*.render.ts` / `*.render.tsx`)
+  - fungsi `renderX(ctx)` yang dipakai di definition
+  - harus pure (no side effects)
+
+3) **(Optional tapi direkomendasikan) Schema/validation**
+  - khusus custom element: validasi `props` (mis. Zod) sebelum dipakai
+  - jangan trust `unknown` dari project JSON
+
+4) **Plugin registration**
+  - buat `DesignerPlugin` yang melakukan `ctx.elements.register(myElementDefinition)`
+  - register plugin dari app (`DesignerApp`) lalu `activateAll(...)`
+
+### Do / Don’t (Model A)
+
+**Do**
+- Render harus deterministik (input sama → output sama).
+- Pisahkan file: `*.definition.ts` untuk metadata + wiring ke functions, `*.render.ts(x)` untuk visual.
+- Gunakan `actions` + `DesignerAPI` untuk behavior (dipanggil dari UI plugin, bukan dari render).
+- Kalau butuh UI properties: register via `DesignerRegistry` (properties sections), bukan edit core panel.
+
+**Don’t**
+- Jangan `api.update...` / publish MQTT / mutate state di `render(ctx)`.
+- Jangan attach `onClick/onMouseEnter/...` di `render(ctx)` untuk kebutuhan global (biar konsisten).
+- Jangan hardcode akses DOM (`document.querySelector`, refs) di `render(ctx)`.
+
+### Flexibility: se-flexible apa Model A vs Model B?
+
+**Model A (default, recommended)**
+- Sangat fleksibel untuk visual (SVG apa pun) + export + actions + props schema.
+- Yang “lebih terbatas” adalah wiring interaksi yang granular per-sub-shape (karena handler dipasang di wrapper). Biasanya masih oke karena event bubble tetap sampai wrapper.
+- Kalau ada kebutuhan super spesifik (mis. element ingin event behavior beda total, atau transform center custom), buat escape hatch yang eksplisit (mis. renderMode self-managed). Jangan jadikan default.
+
+**Model B (self-managed)**
+- Paling fleksibel, tapi biaya maintain tinggi.
+- Risiko drift dan bug tersembunyi paling besar.
+
+### Worth it kah native render via definition?
+
+**Worth it kalau:**
+
+- Kamu ingin semua built-in bisa diperlakukan seperti plugin (override/disable/extend).
+- Kamu akan punya banyak element (native + custom) dan ingin pola yang konsisten.
+- Kamu butuh tempat baku untuk export (`exportSvg`), actions, schema, dll per element.
+
+**Mungkin tidak worth it kalau:**
+
+- App kecil dan jenis element tidak bertambah.
+- Kamu tidak butuh extensibility dan lebih penting simple debugging 1 file.
+
+**Risiko utama (dan mitigasinya):**
+
+- Indirection/debugging: “kok render beda?” → mitigasi: log/trace registry + devtool panel yang menampilkan definition yang aktif.
+- Performance: extra function calls → biasanya negligible untuk skala ini.
+- Ketidakkonsistenan kalau Model B dipakai bebas → mitigasi: Model A default + review/linters.
 
 ### Element Registration
 

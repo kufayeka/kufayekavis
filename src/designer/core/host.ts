@@ -3,7 +3,7 @@ import type { DesignerState } from "./engine";
 import { createDesignerAPI, type DesignerAPI } from "./api";
 import { DesignerRegistry } from "./registry";
 import { PluginManager } from "./plugins";
-import { createBuiltInElementRegistry, type ElementRegistry } from "./elements";
+import { createElementRegistry, type ElementRegistry } from "./elements";
 
 export type DesignerHost = {
   engine: DesignerEngine;
@@ -17,7 +17,7 @@ export function createDesignerHost(initial?: Partial<DesignerState>): DesignerHo
   const engine = new DesignerEngine(initial);
   const registry = new DesignerRegistry();
   const plugins = new PluginManager();
-  const elements = createBuiltInElementRegistry();
+  const elements = createElementRegistry();
   const api = createDesignerAPI(engine, elements);
 
   // Note: We intentionally do NOT auto-activate plugins here.

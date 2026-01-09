@@ -1,4 +1,5 @@
 import type React from "react";
+import { isValidElement } from "react";
 
 import type { DesignerAPI } from "../../../core/api";
 import type { DesignerState } from "../../../core/engine";
@@ -9,12 +10,14 @@ export function RenderTree({
   rootIds,
   onRegister,
   renderCustom,
+  renderNativeByDefinition,
   api,
 }: {
   doc: DesignerState["doc"];
   rootIds: ElementId[];
   onRegister: (id: ElementId, node: SVGElement | null) => void;
   renderCustom: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
+  renderNativeByDefinition?: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
   api: DesignerAPI;
 }) {
   const sorted = [...rootIds]
@@ -37,6 +40,7 @@ export function RenderTree({
           doc={doc}
           onRegister={onRegister}
           renderCustom={renderCustom}
+          renderNativeByDefinition={renderNativeByDefinition}
           api={api}
           forcePublishElementEvents={forcePublishElementEvents}
         />
@@ -50,6 +54,7 @@ function RenderElement({
   doc,
   onRegister,
   renderCustom,
+  renderNativeByDefinition,
   api,
   forcePublishElementEvents,
 }: {
@@ -57,6 +62,7 @@ function RenderElement({
   doc: DesignerState["doc"];
   onRegister: (id: ElementId, node: SVGElement | null) => void;
   renderCustom: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
+  renderNativeByDefinition?: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
   api: DesignerAPI;
   forcePublishElementEvents: boolean;
 }) {
@@ -72,6 +78,31 @@ function RenderElement({
     }
     if (el.rotation) parts.push(`rotate(${el.rotation} ${cx} ${cy})`);
     return parts.length ? parts.join(" ") : undefined;
+  };
+
+  const getTransformForElement = (): string | undefined => {
+    if (el.type === "rect" || el.type === "image" || el.type === "custom") {
+      const cx = el.x + el.width / 2;
+      const cy = el.y + el.height / 2;
+      return getTransform(cx, cy);
+    }
+
+    if (el.type === "circle") {
+      return getTransform(el.cx, el.cy);
+    }
+
+    if (el.type === "line") {
+      const cx = (el.x1 + el.x2) / 2;
+      const cy = (el.y1 + el.y2) / 2;
+      return getTransform(cx, cy);
+    }
+
+    if (el.type === "text") {
+      return getTransform(el.x, el.y);
+    }
+
+    // free + group: no transform center defined here
+    return undefined;
   };
 
   if (el.type === "group") {
@@ -97,231 +128,36 @@ function RenderElement({
     );
   }
 
-  const opacity = el.opacity;
-
-  if (el.type === "rect") {
-    const cx = el.x + el.width / 2;
-    const cy = el.y + el.height / 2;
-    return (
-      <rect
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        x={el.x}
-        y={el.y}
-        width={el.width}
-        height={el.height}
-        rx={el.rx}
-        ry={el.ry}
-        fill={el.fill}
-        stroke={el.stroke}
-        strokeWidth={el.strokeWidth}
-        opacity={opacity}
-        transform={getTransform(cx, cy)}
-        className="cursor-move"
-        onMouseEnter={
-          forcePublishElementEvents || el.enableOnMouseHoverEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
-            : undefined
-        }
-        onClick={
-          forcePublishElementEvents || el.enableOnMouseClickEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
-            : undefined
-        }
-        onMouseLeave={
-          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
-            : undefined
-        }
-      />
-    );
-  }
-
-  if (el.type === "circle") {
-    return (
-      <circle
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        cx={el.cx}
-        cy={el.cy}
-        r={el.r}
-        fill={el.fill}
-        stroke={el.stroke}
-        strokeWidth={el.strokeWidth}
-        opacity={opacity}
-        className="cursor-move"
-        onMouseEnter={
-          forcePublishElementEvents || el.enableOnMouseHoverEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
-            : undefined
-        }
-        onClick={
-          forcePublishElementEvents || el.enableOnMouseClickEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
-            : undefined
-        }
-        onMouseLeave={
-          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
-            : undefined
-        }
-      />
-    );
-  }
-
-  if (el.type === "line") {
-    const cx = (el.x1 + el.x2) / 2;
-    const cy = (el.y1 + el.y2) / 2;
-    return (
-      <line
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        x1={el.x1}
-        y1={el.y1}
-        x2={el.x2}
-        y2={el.y2}
-        stroke={el.stroke}
-        strokeWidth={el.strokeWidth}
-        opacity={opacity}
-        transform={getTransform(cx, cy)}
-        className="cursor-move"
-        onMouseEnter={
-          forcePublishElementEvents || el.enableOnMouseHoverEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
-            : undefined
-        }
-        onClick={
-          forcePublishElementEvents || el.enableOnMouseClickEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
-            : undefined
-        }
-        onMouseLeave={
-          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
-            : undefined
-        }
-      />
-    );
-  }
-
-  if (el.type === "free") {
-    return (
-      <path
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        d={el.d}
-        fill={"none"}
-        stroke={el.stroke}
-        strokeWidth={el.strokeWidth}
-        opacity={opacity}
-        className="cursor-move"
-        onMouseEnter={
-          forcePublishElementEvents || el.enableOnMouseHoverEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
-            : undefined
-        }
-        onClick={
-          forcePublishElementEvents || el.enableOnMouseClickEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
-            : undefined
-        }
-        onMouseLeave={
-          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
-            : undefined
-        }
-      />
-    );
-  }
-
-  if (el.type === "image") {
-    const cx = el.x + el.width / 2;
-    const cy = el.y + el.height / 2;
-    const pra = el.fit === "stretch" ? "none" : el.preserveAspectRatio;
-    const transform = getTransform(cx, cy);
-    return (
-      <image
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        href={el.href}
-        x={el.x}
-        y={el.y}
-        width={el.width}
-        height={el.height}
-        preserveAspectRatio={pra}
-        opacity={opacity}
-        transform={transform}
-        className="cursor-move"
-        role="img"
-        onMouseEnter={
-          forcePublishElementEvents || el.enableOnMouseHoverEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
-            : undefined
-        }
-        onClick={
-          forcePublishElementEvents || el.enableOnMouseClickEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
-            : undefined
-        }
-        onMouseLeave={
-          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
-            : undefined
-        }
-      >
-        <title>{el.name?.trim() ? el.name : "Image"}</title>
-      </image>
-    );
-  }
-
-  if (el.type === "text") {
-    const t = el as unknown as {
-      x: number;
-      y: number;
-      text: string;
-      fontSize: number;
-      fontWeight: string;
-      fontStyle?: string;
-      textDecoration?: string;
-      fill: string;
-      opacity: number;
-    };
-    const cx = t.x;
-    const cy = t.y;
-    const transform = getTransform(cx, cy);
-    return (
-      <text
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        x={t.x}
-        y={t.y}
-        fontSize={t.fontSize}
-        fontWeight={t.fontWeight}
-        fontStyle={t.fontStyle}
-        textDecoration={t.textDecoration}
-        fill={t.fill}
-        opacity={t.opacity}
-        transform={transform}
-        className="cursor-move"
-        onMouseEnter={
-          forcePublishElementEvents || el.enableOnMouseHoverEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
-            : undefined
-        }
-        onClick={
-          forcePublishElementEvents || el.enableOnMouseClickEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
-            : undefined
-        }
-        onMouseLeave={
-          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
-            : undefined
-        }
-      >
-        {t.text}
-      </text>
-    );
+  if (el.type !== "custom" && renderNativeByDefinition) {
+    const rendered = renderNativeByDefinition(el, doc);
+    if (isValidElement(rendered)) {
+      return (
+        <g
+          ref={(node) => onRegister(el.id, node)}
+          data-el-id={el.id}
+          opacity={el.opacity}
+          transform={getTransformForElement()}
+          className="cursor-move"
+          onMouseEnter={
+            forcePublishElementEvents || el.enableOnMouseHoverEventListener
+              ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
+              : undefined
+          }
+          onClick={
+            forcePublishElementEvents || el.enableOnMouseClickEventListener
+              ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
+              : undefined
+          }
+          onMouseLeave={
+            forcePublishElementEvents || el.enableOnMouseLeaveEventListener
+              ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
+              : undefined
+          }
+        >
+          {rendered}
+        </g>
+      );
+    }
   }
 
   if (el.type === "custom") {
@@ -334,7 +170,7 @@ function RenderElement({
       <g
         ref={(node) => onRegister(el.id, node)}
         data-el-id={el.id}
-        opacity={opacity}
+        opacity={el.opacity}
         transform={transform}
         className="cursor-move"
         onMouseEnter={

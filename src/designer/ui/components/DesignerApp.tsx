@@ -5,9 +5,6 @@ import { useSyncExternalStore } from "react";
 import { createDesignerHost } from "../../core/host";
 import { useDesignerEngine } from "../hooks/useDesignerEngine";
 import type { ToolType } from "../../core/types";
-import type { DesignerAPI } from "../../core/api";
-import type { DesignerEngine, DesignerState } from "../../core/engine";
-import type { DesignerHost } from "../../core/host";
 import { Ribbon } from "./Ribbon";
 import { LeftPanel } from "./LeftPanel";
 import { RightPanel } from "./RightPanel";
@@ -16,17 +13,8 @@ import { DialogHost } from "./DialogHost";
 import { PopupHost } from "./PopupHost";
 import { SvgCanvas } from "./SvgCanvas";
 import { DesignerHostProvider } from "../hooks/useDesignerHost";
-import { numericDisplayElementDefinition } from "../../../elements/numericDisplay/numericDisplay.definition";
-import { webEmbedElementDefinition } from "../../../elements/webEmbed/webEmbed.definition";
 import { mqttScadaPlugin } from "../../plugins/mqttScadaPlugin";
-import { registerBuiltInUiContributions } from "./builtins/registerBuiltInUi";
-
-type PropertiesSectionRenderCtx = {
-  engine: DesignerEngine;
-  state: DesignerState;
-  api: DesignerAPI;
-  host: DesignerHost;
-};
+import { builtInElementPlugins, builtInUiPlugin } from "../../plugins/builtinPlugins";
 
 export function DesignerApp() {
   const host = useMemo(() => createDesignerHost(), []);
@@ -103,73 +91,13 @@ export function DesignerApp() {
   useEffect(() => {
     const disposers: Array<() => void> = [];
 
-    disposers.push(host.elements.register(numericDisplayElementDefinition));
-    disposers.push(host.elements.register(webEmbedElementDefinition));
-
     // Register + activate plugins.
     // Note: plugins are NOT auto-activated by createDesignerHost().
+    for (const p of builtInElementPlugins) disposers.push(host.plugins.register(p));
+    disposers.push(host.plugins.register(builtInUiPlugin));
     disposers.push(host.plugins.register(mqttScadaPlugin));
-    host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements });
 
-    // Register built-in UI sections into the registry so the shell is fully pluggable.
-    disposers.push(
-      ...registerBuiltInUiContributions({
-        host,
-        engine,
-      }),
-    );
-
-    disposers.push(
-      host.registry.registerPropertiesSection({
-        id: "builtin.numericDisplay.controls",
-        render: (ctx: unknown) => {
-          const { api, state } = ctx as PropertiesSectionRenderCtx;
-          const selectedId = state.selection.ids.length === 1 ? state.selection.ids[0] : null;
-          const el = selectedId ? api.getElement(selectedId) : null;
-          const isNumeric = el && el.type === "custom" && el.kind === "numericDisplay";
-          if (!isNumeric) return null;
-
-          const props = (el.props ?? {}) as Record<string, unknown>;
-          const value = Number(props.value ?? 0);
-          const label = String(props.label ?? "");
-
-          return (
-            <div className="rounded border border-black/10 p-2 space-y-2">
-              <div className="text-sm font-medium">Numeric Display</div>
-              <div className="text-xs text-black/60">value: {Number.isFinite(value) ? value : 0}</div>
-              <div className="text-xs text-black/60">label: {label || "(empty)"}</div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  className="px-2 py-1 rounded border border-black/15 hover:bg-black/5"
-                  onClick={() => api.callElementAction(el.id, "setValueToDefault")}
-                >
-                  Reset (action)
-                </button>
-                <button
-                  className="px-2 py-1 rounded border border-black/15 hover:bg-black/5"
-                  onClick={() => api.updateCustomProps(el.id, { label: "RPM" })}
-                >
-                  Set label=RPM
-                </button>
-                <button
-                  className="px-2 py-1 rounded border border-black/15 hover:bg-black/5"
-                  onClick={() => api.callElementAction(el.id, "setBoxColor", "#111827")}
-                >
-                  Box #111827
-                </button>
-                <button
-                  className="px-2 py-1 rounded border border-black/15 hover:bg-black/5"
-                  onClick={() => api.updateCustomProps(el.id, { valueColor: "#22c55e" })}
-                >
-                  Value green
-                </button>
-              </div>
-            </div>
-          );
-        },
-      }),
-    );
+    host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements, host, engine });
 
     return () => {
       for (const d of disposers) {

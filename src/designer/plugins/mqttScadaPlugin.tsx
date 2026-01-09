@@ -3,6 +3,8 @@
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import mqtt, { type IClientOptions, type MqttClient } from "mqtt";
+import { match } from "ts-pattern";
+import { z } from "zod";
 
 import type { DesignerPlugin } from "../core/plugins";
 import type { DesignerAPI } from "../core/api";
@@ -57,10 +59,6 @@ function coerceSettings(value: unknown): MqttScadaSettings {
   };
 }
 
-function asBool(v: unknown): v is boolean {
-  return typeof v === "boolean";
-}
-
 function jsonSafeParse(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -79,265 +77,270 @@ function applyRemoteControlCommand(
   cmd: unknown,
   publishResponse?: (payload: unknown) => void,
 ) {
-  if (!cmd || typeof cmd !== "object") return;
-  const o = cmd as Record<string, unknown>;
-  const action = String(o.action ?? "");
-  const payload = (o.payload ?? {}) as Record<string, unknown>;
-  const requestId = typeof o.requestId === "string" ? o.requestId : undefined;
+
+  const envelopeSchema = z.object({
+    action: z.string().min(1),
+    payload: z.unknown().optional(),
+    requestId: z.string().optional(),
+  });
+
+  const env = envelopeSchema.safeParse(cmd);
+  if (!env.success) return;
+
+  const action = env.data.action;
+  const payloadRaw = env.data.payload;
+  const requestId = env.data.requestId;
 
   const respond = (p: Record<string, unknown>) => {
     publishResponse?.({ requestId, ...p });
   };
 
-  if (action === "select") {
-    const ids = Array.isArray(payload.ids) ? (payload.ids.filter((x) => typeof x === "string") as string[]) : [];
-    const append = asBool(payload.append) ? payload.append : false;
-    api.select(ids, { append });
-    return;
-  }
+  const asObj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+  const payload = asObj(payloadRaw);
 
-  if (action === "clearSelection") {
-    api.clearSelection();
-    return;
-  }
-
-  if (action === "setTool") {
-    api.setTool(String(payload.tool ?? "select"));
-    return;
-  }
-
-  if (action === "setViewMode") {
-    api.setViewMode(Boolean(payload.value));
-    return;
-  }
-
-  if (action === "setZoom") {
-    const p = payload as Record<string, unknown>;
-    const scale = Number.isFinite(p.scale) ? Number(p.scale) : undefined;
-    const panX = Number.isFinite(p.panX) ? Number(p.panX) : undefined;
-    const panY = Number.isFinite(p.panY) ? Number(p.panY) : undefined;
-    api.engine.setZoom({
-      ...(scale !== undefined ? { scale } : null),
-      ...(panX !== undefined ? { panX } : null),
-      ...(panY !== undefined ? { panY } : null),
-    });
-    return;
-  }
-
-  if (action === "setCanvas") {
-    api.setCanvas((payload as unknown) as Partial<ReturnType<typeof api.getDocument>["canvas"]>);
-    return;
-  }
-
-  if (action === "getDocument") {
-    respond({ type: "getDocument", ok: true, doc: api.getDocument() });
-    return;
-  }
-
-  if (action === "listElements") {
-    const doc = api.getDocument();
-    respond({
-      type: "listElements",
-      ok: true,
-      rootIds: doc.rootIds,
-      ids: Object.keys(doc.elements),
-    });
-    return;
-  }
-
-  if (action === "getElement") {
-    const id = String(payload.id ?? "");
-    const el = id ? api.getElement(id) : undefined;
-    respond({ type: "getElement", ok: Boolean(el), element: el ?? null });
-    return;
-  }
-
-  if (action === "getPluginSettings") {
-    const pluginId = String(payload.pluginId ?? "");
-    if (!pluginId) {
-      respond({ type: "getPluginSettings", ok: false, error: "pluginId is required" });
-      return;
+  const idsSchema = z.array(z.string()).default([]);
+  const numberOpt = z.preprocess((v) => {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim()) {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
     }
-    respond({ type: "getPluginSettings", ok: true, pluginId, value: api.getPluginSettings(pluginId) });
-    return;
-  }
+    return undefined;
+  }, z.number().optional());
 
-  if (action === "setPluginSettings") {
-    const pluginId = String(payload.pluginId ?? "");
-    if (!pluginId) return;
-    api.setPluginSettings(pluginId, payload.value);
-    respond({ type: "setPluginSettings", ok: true, pluginId });
-    return;
-  }
-
-  if (action === "patchPluginSettings") {
-    const pluginId = String(payload.pluginId ?? "");
-    const patch = payload.patch;
-    if (!pluginId) return;
-    if (!patch || typeof patch !== "object") return;
-    const cur = api.getPluginSettings(pluginId);
-    const curObj = cur && typeof cur === "object" ? (cur as Record<string, unknown>) : {};
-    api.setPluginSettings(pluginId, { ...curObj, ...(patch as Record<string, unknown>) });
-    respond({ type: "patchPluginSettings", ok: true, pluginId });
-    return;
-  }
-
-  if (action === "getUiLayout") {
-    if (!registry) {
-      respond({ type: "getUiLayout", ok: false, error: "registry not available" });
-      return;
-    }
-    respond({ type: "getUiLayout", ok: true, layout: registry.getUiLayout() });
-    return;
-  }
-
-  if (action === "setUiLayout") {
-    if (!registry) return;
-    const p = payload as Partial<UiLayoutState>;
-    registry.setUiLayout({
-      ...(typeof p.leftPanelVisible === "boolean" ? { leftPanelVisible: p.leftPanelVisible } : null),
-      ...(typeof p.rightPanelVisible === "boolean" ? { rightPanelVisible: p.rightPanelVisible } : null),
-      ...(typeof p.focusCanvas === "boolean" ? { focusCanvas: p.focusCanvas } : null),
-    });
-    return;
-  }
-
-  if (action === "toggleLeftPanel") {
-    if (!registry) return;
-    registry.toggleLeftPanel();
-    return;
-  }
-
-  if (action === "toggleRightPanel") {
-    if (!registry) return;
-    registry.toggleRightPanel();
-    return;
-  }
-
-  if (action === "toggleFocusCanvas") {
-    if (!registry) return;
-    registry.toggleFocusCanvas();
-    return;
-  }
-
-  if (action === "exportProjectJson") {
-    const json = api.exportProjectJson();
-    respond({ type: "exportProjectJson", ok: true, json });
-    return;
-  }
-
-  if (action === "importProjectJson") {
-    const jsonText = typeof payload.jsonText === "string" ? payload.jsonText : null;
-    const docObj = payload.doc;
-    try {
-      if (jsonText && jsonText.trim()) {
-        api.importProjectJson(jsonText);
-      } else if (docObj && typeof docObj === "object") {
-        api.importProjectJson(JSON.stringify(docObj));
-      } else {
-        throw new Error("jsonText or doc is required");
+  match(action)
+    .with("select", () => {
+      const parsed = z
+        .object({
+          ids: idsSchema,
+          append: z.boolean().optional(),
+        })
+        .safeParse(payload);
+      if (!parsed.success) return;
+      api.select(parsed.data.ids, { append: parsed.data.append ?? false });
+    })
+    .with("clearSelection", () => {
+      api.clearSelection();
+    })
+    .with("setTool", () => {
+      const parsed = z.object({ tool: z.string().default("select") }).safeParse(payload);
+      if (!parsed.success) return;
+      api.setTool(parsed.data.tool);
+    })
+    .with("setViewMode", () => {
+      const parsed = z.object({ value: z.boolean() }).safeParse(payload);
+      if (!parsed.success) return;
+      api.setViewMode(parsed.data.value);
+    })
+    .with("setZoom", () => {
+      const parsed = z
+        .object({
+          scale: numberOpt,
+          panX: numberOpt,
+          panY: numberOpt,
+        })
+        .safeParse(payload);
+      if (!parsed.success) return;
+      api.engine.setZoom({
+        ...(parsed.data.scale !== undefined ? { scale: parsed.data.scale } : null),
+        ...(parsed.data.panX !== undefined ? { panX: parsed.data.panX } : null),
+        ...(parsed.data.panY !== undefined ? { panY: parsed.data.panY } : null),
+      });
+    })
+    .with("setCanvas", () => {
+      api.setCanvas((payloadRaw as unknown) as Partial<ReturnType<typeof api.getDocument>["canvas"]>);
+    })
+    .with("getDocument", () => {
+      respond({ type: "getDocument", ok: true, doc: api.getDocument() });
+    })
+    .with("listElements", () => {
+      const doc = api.getDocument();
+      respond({ type: "listElements", ok: true, rootIds: doc.rootIds, ids: Object.keys(doc.elements) });
+    })
+    .with("getElement", () => {
+      const parsed = z.object({ id: z.string().min(1) }).safeParse(payload);
+      if (!parsed.success) {
+        respond({ type: "getElement", ok: false, element: null });
+        return;
       }
-      respond({ type: "importProjectJson", ok: true });
-    } catch (err) {
-      respond({ type: "importProjectJson", ok: false, error: err instanceof Error ? err.message : String(err) });
-    }
-    return;
-  }
-
-  if (action === "deleteAllElements") {
-    const doc = api.getDocument();
-    api.deleteElements([...doc.rootIds]);
-    return;
-  }
-
-  if (action === "createElement") {
-    const input = payload.input as unknown;
-    const patch = payload.patch as unknown;
-    if (input && typeof input === "object") {
-      const id = api.createElement(input as CreateElementInput);
-      if (patch && typeof patch === "object") api.updateElement(id, patch as Partial<DesignerElement>);
+      const el = api.getElement(parsed.data.id);
+      respond({ type: "getElement", ok: Boolean(el), element: el ?? null });
+    })
+    .with("getPluginSettings", () => {
+      const parsed = z.object({ pluginId: z.string().min(1) }).safeParse(payload);
+      if (!parsed.success) {
+        respond({ type: "getPluginSettings", ok: false, error: "pluginId is required" });
+        return;
+      }
+      respond({ type: "getPluginSettings", ok: true, pluginId: parsed.data.pluginId, value: api.getPluginSettings(parsed.data.pluginId) });
+    })
+    .with("setPluginSettings", () => {
+      const parsed = z.object({ pluginId: z.string().min(1), value: z.unknown().optional() }).safeParse(payload);
+      if (!parsed.success) return;
+      api.setPluginSettings(parsed.data.pluginId, parsed.data.value);
+      respond({ type: "setPluginSettings", ok: true, pluginId: parsed.data.pluginId });
+    })
+    .with("patchPluginSettings", () => {
+      const parsed = z
+        .object({
+          pluginId: z.string().min(1),
+          patch: z.record(z.string(), z.unknown()),
+        })
+        .safeParse(payload);
+      if (!parsed.success) return;
+      const cur = api.getPluginSettings(parsed.data.pluginId);
+      const curObj = cur && typeof cur === "object" ? (cur as Record<string, unknown>) : {};
+      api.setPluginSettings(parsed.data.pluginId, { ...curObj, ...parsed.data.patch });
+      respond({ type: "patchPluginSettings", ok: true, pluginId: parsed.data.pluginId });
+    })
+    .with("getUiLayout", () => {
+      if (!registry) {
+        respond({ type: "getUiLayout", ok: false, error: "registry not available" });
+        return;
+      }
+      respond({ type: "getUiLayout", ok: true, layout: registry.getUiLayout() });
+    })
+    .with("setUiLayout", () => {
+      if (!registry) return;
+      const parsed = z
+        .object({
+          leftPanelVisible: z.boolean().optional(),
+          rightPanelVisible: z.boolean().optional(),
+          focusCanvas: z.boolean().optional(),
+        })
+        .safeParse(payload);
+      if (!parsed.success) return;
+      const p = parsed.data as Partial<UiLayoutState>;
+      registry.setUiLayout({
+        ...(typeof p.leftPanelVisible === "boolean" ? { leftPanelVisible: p.leftPanelVisible } : null),
+        ...(typeof p.rightPanelVisible === "boolean" ? { rightPanelVisible: p.rightPanelVisible } : null),
+        ...(typeof p.focusCanvas === "boolean" ? { focusCanvas: p.focusCanvas } : null),
+      });
+    })
+    .with("toggleLeftPanel", () => {
+      if (!registry) return;
+      registry.toggleLeftPanel();
+    })
+    .with("toggleRightPanel", () => {
+      if (!registry) return;
+      registry.toggleRightPanel();
+    })
+    .with("toggleFocusCanvas", () => {
+      if (!registry) return;
+      registry.toggleFocusCanvas();
+    })
+    .with("exportProjectJson", () => {
+      const json = api.exportProjectJson();
+      respond({ type: "exportProjectJson", ok: true, json });
+    })
+    .with("importProjectJson", () => {
+      const parsed = z
+        .object({
+          jsonText: z.string().optional(),
+          doc: z.record(z.string(), z.unknown()).optional(),
+        })
+        .safeParse(payload);
+      try {
+        if (parsed.success && parsed.data.jsonText && parsed.data.jsonText.trim()) {
+          api.importProjectJson(parsed.data.jsonText);
+        } else if (parsed.success && parsed.data.doc && typeof parsed.data.doc === "object") {
+          api.importProjectJson(JSON.stringify(parsed.data.doc));
+        } else {
+          throw new Error("jsonText or doc is required");
+        }
+        respond({ type: "importProjectJson", ok: true });
+      } catch (err) {
+        respond({ type: "importProjectJson", ok: false, error: err instanceof Error ? err.message : String(err) });
+      }
+    })
+    .with("deleteAllElements", () => {
+      const doc = api.getDocument();
+      api.deleteElements([...doc.rootIds]);
+    })
+    .with("createElement", () => {
+      const parsed = z
+        .object({
+          input: z.unknown(),
+          patch: z.unknown().optional(),
+        })
+        .safeParse(payload);
+      if (!parsed.success) return;
+      if (!parsed.data.input || typeof parsed.data.input !== "object") return;
+      const id = api.createElement(parsed.data.input as CreateElementInput);
+      if (parsed.data.patch && typeof parsed.data.patch === "object") api.updateElement(id, parsed.data.patch as Partial<DesignerElement>);
       respond({ type: "createElement", ok: true, id });
-    }
-    return;
-  }
-
-  if (action === "updateElement") {
-    const id = String(payload.id ?? "");
-    const patch = payload.patch as unknown;
-    if (id && patch && typeof patch === "object") api.updateElement(id, patch as Partial<DesignerElement>);
-    return;
-  }
-
-  if (action === "bulkUpdateElements") {
-    const updates = Array.isArray(payload.updates) ? payload.updates : [];
-    if (updates.length === 0) return;
-    api.engine.beginHistoryBatch();
-    try {
-      for (const u of updates) {
-        if (!u || typeof u !== "object") continue;
-        const ur = u as Record<string, unknown>;
-        const id = typeof ur.id === "string" ? ur.id : "";
-        const patch = ur.patch;
-        if (!id) continue;
-        if (!patch || typeof patch !== "object") continue;
-        api.updateElement(id, patch as Partial<DesignerElement>);
+    })
+    .with("updateElement", () => {
+      const parsed = z.object({ id: z.string().min(1), patch: z.record(z.string(), z.unknown()) }).safeParse(payload);
+      if (!parsed.success) return;
+      api.updateElement(parsed.data.id, parsed.data.patch as Partial<DesignerElement>);
+    })
+    .with("bulkUpdateElements", () => {
+      const parsed = z
+        .object({
+          updates: z
+            .array(z.object({ id: z.string().min(1), patch: z.record(z.string(), z.unknown()) }))
+            .default([]),
+        })
+        .safeParse(payload);
+      if (!parsed.success) return;
+      if (parsed.data.updates.length === 0) return;
+      api.engine.beginHistoryBatch();
+      try {
+        for (const u of parsed.data.updates) {
+          api.updateElement(u.id, u.patch as Partial<DesignerElement>);
+        }
+      } finally {
+        api.engine.endHistoryBatch();
       }
-    } finally {
-      api.engine.endHistoryBatch();
-    }
-    return;
-  }
-
-  if (action === "updateCustomProps") {
-    const id = String(payload.id ?? "");
-    const patch = payload.patch;
-    if (id && patch && typeof patch === "object") api.updateCustomProps(id, patch as Record<string, unknown>);
-    return;
-  }
-
-  if (action === "callElementAction") {
-    const id = String(payload.id ?? "");
-    const actionId = String(payload.actionId ?? "");
-    const args = Array.isArray(payload.args) ? payload.args : [];
-    if (!id || !actionId) return;
-    try {
-      const result = api.callElementAction(id, actionId, ...args);
-      respond({ type: "callElementAction", ok: true, result });
-    } catch (err) {
-      respond({ type: "callElementAction", ok: false, error: err instanceof Error ? err.message : String(err) });
-    }
-    return;
-  }
-
-  if (action === "deleteElements") {
-    const ids = Array.isArray(payload.ids) ? (payload.ids.filter((x) => typeof x === "string") as string[]) : [];
-    if (ids.length) api.deleteElements(ids);
-    return;
-  }
-
-  if (action === "translate") {
-    const ids = Array.isArray(payload.ids) ? (payload.ids.filter((x) => typeof x === "string") as string[]) : [];
-    const dx = Number.isFinite(payload.dx) ? Number(payload.dx) : 0;
-    const dy = Number.isFinite(payload.dy) ? Number(payload.dy) : 0;
-    if (ids.length) api.translate(ids, dx, dy);
-    return;
-  }
-
-  if (action === "bringToFront") {
-    const ids = Array.isArray(payload.ids) ? (payload.ids.filter((x) => typeof x === "string") as string[]) : [];
-    if (ids.length) api.bringToFront(ids);
-    return;
-  }
-
-  if (action === "groupSelection") {
-    api.groupSelection();
-    return;
-  }
-
-  if (action === "ungroupSelection") {
-    api.ungroupSelection();
-    return;
-  }
+    })
+    .with("updateCustomProps", () => {
+      const parsed = z.object({ id: z.string().min(1), patch: z.record(z.string(), z.unknown()) }).safeParse(payload);
+      if (!parsed.success) return;
+      api.updateCustomProps(parsed.data.id, parsed.data.patch);
+    })
+    .with("callElementAction", () => {
+      const parsed = z
+        .object({
+          id: z.string().min(1),
+          actionId: z.string().min(1),
+          args: z.array(z.unknown()).default([]),
+        })
+        .safeParse(payload);
+      if (!parsed.success) return;
+      try {
+        const result = api.callElementAction(parsed.data.id, parsed.data.actionId, ...parsed.data.args);
+        respond({ type: "callElementAction", ok: true, result });
+      } catch (err) {
+        respond({ type: "callElementAction", ok: false, error: err instanceof Error ? err.message : String(err) });
+      }
+    })
+    .with("deleteElements", () => {
+      const parsed = z.object({ ids: idsSchema }).safeParse(payload);
+      if (!parsed.success) return;
+      if (parsed.data.ids.length) api.deleteElements(parsed.data.ids);
+    })
+    .with("translate", () => {
+      const parsed = z.object({ ids: idsSchema, dx: numberOpt.optional(), dy: numberOpt.optional() }).safeParse(payload);
+      if (!parsed.success) return;
+      const dx = parsed.data.dx ?? 0;
+      const dy = parsed.data.dy ?? 0;
+      if (parsed.data.ids.length) api.translate(parsed.data.ids, dx, dy);
+    })
+    .with("bringToFront", () => {
+      const parsed = z.object({ ids: idsSchema }).safeParse(payload);
+      if (!parsed.success) return;
+      if (parsed.data.ids.length) api.bringToFront(parsed.data.ids);
+    })
+    .with("groupSelection", () => {
+      api.groupSelection();
+    })
+    .with("ungroupSelection", () => {
+      api.ungroupSelection();
+    })
+    .otherwise(() => {
+      // Unknown action: ignore for forward compatibility.
+    });
 }
 
 function buildClientOptions(s: MqttScadaSettings): IClientOptions {

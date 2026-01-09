@@ -2,6 +2,14 @@ import type { DesignerDocument, DesignerElement, ElementId, ToolType } from "./t
 import type { DesignerEngine, DesignerState, CreateElementInput } from "./engine";
 import type { ElementRegistry } from "./elements";
 
+export type ElementActionCtx<E extends DesignerElement = DesignerElement> = {
+  api: DesignerAPI;
+  engine: DesignerEngine;
+  elements: ElementRegistry;
+  element: E;
+  document: DesignerDocument;
+};
+
 export type DesignerApiSubscribe = (listener: () => void) => () => void;
 
 export type DesignerAPI = {

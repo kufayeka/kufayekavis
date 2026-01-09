@@ -85,6 +85,20 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
     [engine, host.api, host.elements],
   );
 
+    const renderNativeByDefinition = useCallback(
+      (el: DesignerElement, doc: DesignerState["doc"]) => {
+        if (el.type === "custom" || el.type === "group") return null;
+        const def = host.elements.getDefinitionForElement(el);
+        if (!def?.render) return null;
+        try {
+          return def.render({ engine, api: host.api, element: el, document: doc, elements: host.elements }) as React.ReactNode;
+        } catch {
+          return null;
+        }
+      },
+      [engine, host.api, host.elements],
+    );
+
   const svgWidth = state.doc.canvas.width * state.zoom.scale;
   const svgHeight = state.doc.canvas.height * state.zoom.scale;
   const viewBox = `0 0 ${state.doc.canvas.width} ${state.doc.canvas.height}`;
@@ -735,6 +749,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
                 else elRefs.current.delete(id);
               }}
               renderCustom={renderCustom}
+              renderNativeByDefinition={renderNativeByDefinition}
               api={host.api}
             />
 

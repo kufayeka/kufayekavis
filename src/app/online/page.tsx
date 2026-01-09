@@ -7,8 +7,7 @@ import { DesignerHostProvider } from "../../designer/ui/hooks/useDesignerHost";
 import { SvgCanvas } from "../../designer/ui/components/SvgCanvas";
 import { DialogHost } from "../../designer/ui/components/DialogHost";
 import { PopupHost } from "../../designer/ui/components/PopupHost";
-import { numericDisplayElementDefinition } from "../../elements/numericDisplay/numericDisplay.definition";
-import { webEmbedElementDefinition } from "../../elements/webEmbed/webEmbed.definition";
+import { builtInElementPlugins } from "../../designer/plugins/builtinPlugins";
 
 export default function OnlinePage() {
   const host = useMemo(() => createDesignerHost(), []);
@@ -23,8 +22,9 @@ export default function OnlinePage() {
 
     // Register built-in custom elements so they render correctly.
     const disposers: Array<() => void> = [];
-    disposers.push(host.elements.register(numericDisplayElementDefinition));
-    disposers.push(host.elements.register(webEmbedElementDefinition));
+
+    for (const p of builtInElementPlugins) disposers.push(host.plugins.register(p));
+    host.plugins.activateAll({ api: host.api, registry: host.registry, elements: host.elements, host, engine });
 
     // Restore the last autosaved project (if any).
     const storageKey = "kufayekavis.designer.project.v1";

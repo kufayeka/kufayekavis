@@ -1,19 +1,9 @@
 import type { ElementDefinition } from "../../designer/core/elements";
-import type { DesignerAPI } from "../../designer/core/api";
-import type { DesignerEngine } from "../../designer/core/engine";
-import type { DesignerDocument, CustomElement } from "../../designer/core/types";
-import type { ElementRegistry } from "../../designer/core/elements";
+import type { CustomElement } from "../../designer/core/types";
 import { exportWebEmbedSvg, renderWebEmbed } from "./webEmbed.render";
+import { webEmbedActions } from "./webEmbed.actions";
 
 export const WEB_EMBED_KIND = "webEmbed" as const;
-
-type WebEmbedActionCtx = {
-    api: DesignerAPI;
-    engine: DesignerEngine;
-    elements: ElementRegistry;
-    element: CustomElement;
-    document: DesignerDocument;
-};
 
 export const webEmbedElementDefinition: ElementDefinition = {
     id: `custom:${WEB_EMBED_KIND}`,
@@ -43,21 +33,5 @@ export const webEmbedElementDefinition: ElementDefinition = {
     render: renderWebEmbed,
     exportSvg: exportWebEmbedSvg,
 
-    actions: {
-        setUrl: (ctx: unknown, url?: unknown) => {
-            const { api, element } = ctx as WebEmbedActionCtx;
-            if (typeof url === "string" && url.trim()) {
-                api.updateCustomProps(element.id, { url: url.trim() });
-            }
-        },
-        reload: (ctx: unknown) => {
-            const { api, element } = ctx as WebEmbedActionCtx;
-            // Force reload by updating a timestamp prop
-            const currentProps = element.props || {};
-            api.updateCustomProps(element.id, {
-                ...currentProps,
-                reloadTrigger: Date.now()
-            });
-        },
-    },
+    actions: webEmbedActions,
 };

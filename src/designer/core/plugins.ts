@@ -1,4 +1,6 @@
 import type { DesignerAPI } from "./api";
+import type { DesignerEngine } from "./engine";
+import type { DesignerHost } from "./host";
 import type { DesignerRegistry } from "./registry";
 import type { ElementRegistry } from "./elements";
 
@@ -8,6 +10,10 @@ export type DesignerPluginContext = {
   api: DesignerAPI;
   registry: DesignerRegistry;
   elements: ElementRegistry;
+
+  // Optional: provided by the embedding app for "native" plugins.
+  host?: DesignerHost;
+  engine?: DesignerEngine;
 };
 
 export type DesignerPlugin = {

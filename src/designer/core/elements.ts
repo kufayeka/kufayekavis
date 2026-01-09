@@ -84,6 +84,10 @@ export class ElementRegistry {
   }
 }
 
+export function createElementRegistry(): ElementRegistry {
+  return new ElementRegistry();
+}
+
 export function createBuiltInElementRegistry(): ElementRegistry {
   const reg = new ElementRegistry();
 
