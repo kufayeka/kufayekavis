@@ -3,6 +3,7 @@
 import type { ToolType } from "../../core/types";
 import { useDesignerHost } from "../hooks/useDesignerHost";
 import { useSyncExternalStore } from "react";
+import clsx from "clsx";
 
 const tools: Array<{ tool: ToolType; label: string; draggable?: boolean; dragId?: string }> = [
   { tool: "select", label: "Select", draggable: false },
@@ -33,10 +34,10 @@ export function PalettePanel({
         {tools.map((t) => (
           <button
             key={t.tool}
-            className={
-              "px-3 py-2 rounded border text-left " +
-              (activeTool === t.tool ? "border-black/40 bg-black/5" : "border-black/15 hover:bg-black/5")
-            }
+            className={clsx(
+              "px-3 py-2 rounded border text-left",
+              activeTool === t.tool ? "border-black/40 bg-black/5" : "border-black/15 hover:bg-black/5",
+            )}
             onClick={() => onToolChange(t.tool)}
             draggable={Boolean(t.draggable)}
             onDragStart={(e) => {
@@ -52,9 +53,7 @@ export function PalettePanel({
         {elementItems.map((it) => (
           <button
             key={it.id}
-            className={
-              "px-3 py-2 rounded border text-left border-black/15 hover:bg-black/5"
-            }
+            className={clsx("px-3 py-2 rounded border text-left", "border-black/15 hover:bg-black/5")}
             onClick={() => onToolChange(it.id)}
             draggable
             onDragStart={(e) => {

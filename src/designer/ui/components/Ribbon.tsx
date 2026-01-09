@@ -3,6 +3,7 @@
 import type React from "react";
 import { useMemo, useState } from "react";
 import { useSyncExternalStore } from "react";
+import clsx from "clsx";
 import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { RibbonAction, TopRibbonItem } from "../../core/registry";
 import { useDesignerHost } from "../hooks/useDesignerHost";
@@ -65,12 +66,14 @@ export function Ribbon({ engine, state }: { engine: DesignerEngine; state: Desig
     return [...base, ...legacy];
   }, [legacyRibbonActions, visibleTopItems]);
 
+  const buttonClass = clsx("px-3 py-1.5 rounded border border-black/15 hover:bg-black/5");
+
   const renderItem = (it: TopRibbonItem): React.ReactNode => {
     if (it.kind === "button") {
       return (
         <button
           key={it.id}
-          className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
+          className={buttonClass}
           onClick={it.onClick}
           disabled={it.disabled}
           title={it.label}
@@ -90,7 +93,7 @@ export function Ribbon({ engine, state }: { engine: DesignerEngine; state: Desig
           <div className="flex flex-nowrap items-center gap-2">{right.map(renderItem)}</div>
           <div className="flex flex-nowrap items-center gap-2">
             <button
-              className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
+              className={buttonClass}
               onClick={() => engine.setZoom({ scale: state.zoom.scale / 1.1 })}
             >
               -
@@ -131,7 +134,7 @@ export function Ribbon({ engine, state }: { engine: DesignerEngine; state: Desig
               title="Zoom (%)"
             />
             <button
-              className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
+              className={buttonClass}
               onClick={() => engine.setZoom({ scale: state.zoom.scale * 1.1 })}
             >
               +

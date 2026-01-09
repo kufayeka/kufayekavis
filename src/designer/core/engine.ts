@@ -1,4 +1,5 @@
 import { createId } from "./ids";
+import { produce } from "immer";
 import {
   createCircle,
   createCustom,
@@ -16,6 +17,7 @@ import { exportDocument, importDocument } from "./serialize";
 import { translateElement } from "./transform";
 import { getSelectionBBox } from "./geometry";
 import { canRedo, canUndo, commitDocChange, ensureHistory, redoDoc, undoDoc } from "./history";
+import { normalizeElement } from "./normalize";
 import type {
   CanvasSettings,
   ClipboardPayload,
@@ -317,42 +319,43 @@ export class DesignerEngine {
   updateElement(id: ElementId, patch: Partial<DesignerElement>) {
     const current = this.state.doc.elements[id];
     if (!current) return;
-    const next = { ...current, ...patch } as DesignerElement;
-    const nextDoc: DesignerDocument = {
-      ...this.state.doc,
-      elements: { ...this.state.doc.elements, [id]: next },
-    };
+    const merged = { ...current, ...patch } as unknown;
+    const normalized = normalizeElement(merged);
+    const next = (normalized ?? (merged as DesignerElement)) as DesignerElement;
+    const nextDoc: DesignerDocument = produce(this.state.doc, (draft) => {
+      draft.elements[id] = next;
+    });
     this.commitDoc(nextDoc, undefined, { mode: "buffered" });
   }
 
   updateElements(ids: ElementId[], updater: (el: DesignerElement) => DesignerElement) {
-    const nextElements = { ...this.state.doc.elements };
-    for (const id of ids) {
-      const el = nextElements[id];
-      if (!el) continue;
-      nextElements[id] = updater(el);
-    }
-    const nextDoc: DesignerDocument = { ...this.state.doc, elements: nextElements };
+    const nextDoc: DesignerDocument = produce(this.state.doc, (draft) => {
+      for (const id of ids) {
+        const el = draft.elements[id];
+        if (!el) continue;
+        const updated = updater(el) as unknown;
+        const normalized = normalizeElement(updated);
+        draft.elements[id] = (normalized ?? (updated as DesignerElement)) as DesignerElement;
+      }
+    });
     this.commitDoc(nextDoc, undefined, { mode: "buffered" });
   }
 
   translate(ids: ElementId[], dx: number, dy: number) {
     if (ids.length === 0) return;
-    const nextElements = { ...this.state.doc.elements };
+    const nextDoc: DesignerDocument = produce(this.state.doc, (draft) => {
+      const translateRec = (id: ElementId) => {
+        const el = draft.elements[id];
+        if (!el) return;
+        if (el.type === "group") {
+          for (const childId of el.childIds) translateRec(childId);
+          return;
+        }
+        draft.elements[id] = translateElement(el, dx, dy);
+      };
 
-    const translateRec = (id: ElementId) => {
-      const el = nextElements[id];
-      if (!el) return;
-      if (el.type === "group") {
-        for (const childId of el.childIds) translateRec(childId);
-        return;
-      }
-      nextElements[id] = translateElement(el, dx, dy);
-    };
-
-    for (const id of ids) translateRec(id);
-
-    const nextDoc: DesignerDocument = { ...this.state.doc, elements: nextElements };
+      for (const id of ids) translateRec(id);
+    });
     this.commitDoc(nextDoc, undefined, { mode: "buffered" });
   }
 
@@ -371,35 +374,31 @@ export class DesignerEngine {
     };
     for (const id of ids) visit(id);
 
-    const nextElements: Record<ElementId, DesignerElement> = { ...this.state.doc.elements };
-    for (const id of toDelete) delete nextElements[id];
-
-    const nextRootIds = this.state.doc.rootIds.filter((id) => !toDelete.has(id));
-
-    // Clean up group child lists
-    for (const el of Object.values(nextElements)) {
-      if (el.type === "group") {
-        const nextChildIds = el.childIds.filter((cid) => !toDelete.has(cid));
-        nextElements[el.id] = { ...el, childIds: nextChildIds };
-      }
-    }
-
     const nextSelection = this.state.selection.ids.filter((id) => !toDelete.has(id));
 
-    const nextDoc: DesignerDocument = { ...this.state.doc, elements: nextElements, rootIds: nextRootIds };
+    const nextDoc: DesignerDocument = produce(this.state.doc, (draft) => {
+      for (const id of toDelete) delete draft.elements[id];
+      draft.rootIds = draft.rootIds.filter((id) => !toDelete.has(id));
+
+      for (const el of Object.values(draft.elements)) {
+        if (el.type !== "group") continue;
+        el.childIds = el.childIds.filter((cid) => !toDelete.has(cid));
+      }
+    });
     this.commitDoc(nextDoc, { selection: { ids: nextSelection } });
   }
 
   bringToFront(ids: ElementId[]) {
     if (ids.length === 0) return;
-    const nextElements = { ...this.state.doc.elements };
-    let nextZ = this.state.doc.nextZ;
-    for (const id of ids) {
-      const el = nextElements[id];
-      if (!el) continue;
-      nextElements[id] = { ...el, zIndex: nextZ++ } as DesignerElement;
-    }
-    const nextDoc: DesignerDocument = { ...this.state.doc, elements: nextElements, nextZ };
+    const nextDoc: DesignerDocument = produce(this.state.doc, (draft) => {
+      let nextZ = draft.nextZ;
+      for (const id of ids) {
+        const el = draft.elements[id];
+        if (!el) continue;
+        el.zIndex = nextZ++;
+      }
+      draft.nextZ = nextZ;
+    });
     this.commitDoc(nextDoc);
   }
 
@@ -421,47 +420,42 @@ export class DesignerEngine {
     const zIndex = this.state.doc.nextZ;
     const group = createGroup({ id: groupId, zIndex, childIds: [...existing], parentId: commonParentId ?? undefined });
 
-    const nextElements = { ...this.state.doc.elements, [groupId]: group };
+    const nextDoc: DesignerDocument = produce(this.state.doc, (draft) => {
+      draft.nextZ += 1;
+      draft.elements[groupId] = group;
 
-    // Detach selected elements from their previous parents (root or group)
-    const nextRootIds = [...this.state.doc.rootIds];
-    for (const id of existing) {
-      const el = nextElements[id];
-      if (!el) continue;
+      // Detach selected elements from their previous parents (root or group)
+      for (const id of existing) {
+        const el = draft.elements[id];
+        if (!el) continue;
 
-      const prevParentId = el.parentId;
-      if (prevParentId) {
-        const parent = nextElements[prevParentId];
+        const prevParentId = el.parentId;
+        if (prevParentId) {
+          const parent = draft.elements[prevParentId];
+          if (parent && parent.type === "group") {
+            parent.childIds = parent.childIds.filter((cid) => cid !== id);
+          }
+        } else {
+          const idx = draft.rootIds.indexOf(id);
+          if (idx >= 0) draft.rootIds.splice(idx, 1);
+        }
+
+        el.parentId = groupId;
+      }
+
+      if (commonParentId) {
+        const parent = draft.elements[commonParentId];
         if (parent && parent.type === "group") {
-          nextElements[prevParentId] = { ...parent, childIds: parent.childIds.filter((cid) => cid !== id) };
+          parent.childIds.push(groupId);
+        } else {
+          // Parent id existed but isn't a group anymore; fall back to root
+          draft.rootIds.push(groupId);
+          (draft.elements[groupId] as DesignerElement).parentId = undefined;
         }
       } else {
-        const idx = nextRootIds.indexOf(id);
-        if (idx >= 0) nextRootIds.splice(idx, 1);
+        draft.rootIds.push(groupId);
       }
-
-      nextElements[id] = { ...el, parentId: groupId } as DesignerElement;
-    }
-
-    if (commonParentId) {
-      const parent = nextElements[commonParentId];
-      if (parent && parent.type === "group") {
-        nextElements[commonParentId] = { ...parent, childIds: [...parent.childIds, groupId] };
-      } else {
-        // Parent id existed but isn't a group anymore; fall back to root
-        nextRootIds.push(groupId);
-        nextElements[groupId] = { ...group, parentId: undefined };
-      }
-    } else {
-      nextRootIds.push(groupId);
-    }
-
-    const nextDoc: DesignerDocument = {
-      ...this.state.doc,
-      nextZ: this.state.doc.nextZ + 1,
-      elements: nextElements,
-      rootIds: nextRootIds,
-    };
+    });
     this.commitDoc(nextDoc, { selection: { ids: [groupId] } });
 
     return groupId;
@@ -471,49 +465,48 @@ export class DesignerEngine {
     const selected = this.state.selection.ids;
     if (selected.length === 0) return [];
 
-    const nextElements = { ...this.state.doc.elements };
-    const nextRootIds = [...this.state.doc.rootIds];
     const nextSelection: ElementId[] = [];
 
-    for (const id of selected) {
-      const el = nextElements[id];
-      if (!el || el.type !== "group") continue;
+    const nextDoc: DesignerDocument = produce(this.state.doc, (draft) => {
+      for (const id of selected) {
+        const el = draft.elements[id];
+        if (!el || el.type !== "group") continue;
 
-      const group = el;
-      const parentId = group.parentId;
+        const group = el;
+        const parentId = group.parentId;
 
-      // Remove group from its container
-      if (parentId) {
-        const parent = nextElements[parentId];
-        if (parent && parent.type === "group") {
-          const groupIndex = parent.childIds.indexOf(group.id);
-          const withoutGroup = parent.childIds.filter((cid) => cid !== group.id);
-          const insertAt = groupIndex >= 0 ? groupIndex : withoutGroup.length;
-          const nextChildIds = [...withoutGroup];
-          nextChildIds.splice(insertAt, 0, ...group.childIds);
-          nextElements[parentId] = { ...parent, childIds: nextChildIds };
-        }
-      } else {
-        const groupIndex = nextRootIds.indexOf(group.id);
-        if (groupIndex >= 0) {
-          nextRootIds.splice(groupIndex, 1, ...group.childIds);
+        // Remove group from its container
+        if (parentId) {
+          const parent = draft.elements[parentId];
+          if (parent && parent.type === "group") {
+            const groupIndex = parent.childIds.indexOf(group.id);
+            const withoutGroup = parent.childIds.filter((cid) => cid !== group.id);
+            const insertAt = groupIndex >= 0 ? groupIndex : withoutGroup.length;
+            const nextChildIds = [...withoutGroup];
+            nextChildIds.splice(insertAt, 0, ...group.childIds);
+            parent.childIds = nextChildIds;
+          }
         } else {
-          nextRootIds.push(...group.childIds);
+          const groupIndex = draft.rootIds.indexOf(group.id);
+          if (groupIndex >= 0) {
+            draft.rootIds.splice(groupIndex, 1, ...group.childIds);
+          } else {
+            draft.rootIds.push(...group.childIds);
+          }
         }
+
+        // Re-parent children
+        for (const childId of group.childIds) {
+          const child = draft.elements[childId];
+          if (!child) continue;
+          child.parentId = parentId;
+          nextSelection.push(childId);
+        }
+
+        delete draft.elements[group.id];
       }
+    });
 
-      // Re-parent children
-      for (const childId of group.childIds) {
-        const child = nextElements[childId];
-        if (!child) continue;
-        nextElements[childId] = { ...child, parentId } as DesignerElement;
-        nextSelection.push(childId);
-      }
-
-      delete nextElements[group.id];
-    }
-
-    const nextDoc: DesignerDocument = { ...this.state.doc, elements: nextElements, rootIds: nextRootIds };
     this.commitDoc(nextDoc, { selection: { ids: nextSelection } });
 
     return nextSelection;

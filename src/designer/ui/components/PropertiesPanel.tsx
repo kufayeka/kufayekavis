@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import type React from "react";
 import { HexColorPicker } from "react-colorful";
+import clsx from "clsx";
 import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { DesignerElement, ImageElement, TextElement, CustomElement } from "../../core/types";
 import { useDesignerHost } from "../hooks/useDesignerHost";
@@ -117,7 +118,7 @@ function ColorInput({
         {textInput(id, value, onChange)}
         <button
           type="button"
-          className={`h-8 w-8 rounded border border-black flex items-center justify-center cursor-pointer`}
+          className={clsx("h-8 w-8 rounded border border-black flex items-center justify-center cursor-pointer")}
           aria-label="Open color picker"
           onClick={() => setOpen((v) => !v)}
         >

@@ -1,27 +1,20 @@
 import type { CanvasSettings, ClipboardPayload, DesignerDocument } from "./types";
+import { normalizeDocument } from "./normalize";
 
 export function exportDocument(doc: DesignerDocument): string {
   return JSON.stringify(doc, null, 2);
 }
 
 export function importDocument(jsonText: string): DesignerDocument {
-  const parsed = JSON.parse(jsonText) as DesignerDocument;
-  if (!parsed || parsed.version !== 1) {
-    throw new Error("Unsupported project file version");
+  const parsed = JSON.parse(jsonText) as unknown;
+  // Normalization validates required fields and coerces element shapes.
+  // Unknown fields are preserved for forward compatibility.
+  const doc = normalizeDocument(parsed);
+  // Backward-compat: older exports might omit snapToGrid.
+  if (typeof (doc.canvas as unknown as Partial<CanvasSettings>).snapToGrid !== "boolean") {
+    (doc.canvas as CanvasSettings).snapToGrid = false;
   }
-  if (!parsed.canvas || typeof parsed.canvas.width !== "number") {
-    throw new Error("Invalid project file");
-  }
-  const canvas = parsed.canvas as unknown as Partial<CanvasSettings>;
-  if (typeof canvas.snapToGrid !== "boolean") {
-    (parsed.canvas as CanvasSettings).snapToGrid = false;
-  }
-
-  if (!parsed.pluginSettings || typeof parsed.pluginSettings !== "object") {
-    (parsed as DesignerDocument).pluginSettings = {};
-  }
-
-  return parsed;
+  return doc;
 }
 
 export function exportClipboard(payload: ClipboardPayload): string {

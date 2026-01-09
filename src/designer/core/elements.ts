@@ -16,7 +16,7 @@ export type ElementDefinition = {
   palette?: { label: string; order?: number };
 
   // Create input for engine.createElement from a placement point
-  createInput: (pt: { x: number; y: number }) => CreateElementInput;
+  createInput?: (pt: { x: number; y: number }) => CreateElementInput;
 
   // Optional exports/render hooks (UI layer may cast these)
   render?: (ctx: unknown) => unknown;
@@ -79,7 +79,7 @@ export class ElementRegistry {
   // Convenience: place from palette
   createFromPalette(engine: DesignerEngine, paletteId: string, pt: { x: number; y: number }): ElementId | null {
     const def = this.getDefinition(paletteId);
-    if (!def) return null;
+    if (!def || !def.createInput) return null;
     return engine.createElement(def.createInput(pt));
   }
 }
@@ -112,6 +112,14 @@ export function createBuiltInElementRegistry(): ElementRegistry {
   });
 
   reg.register({
+    id: "free",
+    type: "free",
+    label: "Free Draw",
+    palette: { label: "Free Draw", order: 35 },
+    createInput: (pt) => ({ type: "free", d: `M ${pt.x} ${pt.y} L ${pt.x + 80} ${pt.y + 40}` }),
+  });
+
+  reg.register({
     id: "image",
     type: "image",
     label: "Image",
@@ -125,6 +133,14 @@ export function createBuiltInElementRegistry(): ElementRegistry {
     label: "Text",
     palette: { label: "Text", order: 50 },
     createInput: (pt) => ({ type: "text", x: pt.x, y: pt.y, text: "Text" }),
+  });
+
+  // Group elements are created via selection/grouping UX, not from the palette.
+  // Still registered so the system has a complete definition set for all native types.
+  reg.register({
+    id: "group",
+    type: "group",
+    label: "Group",
   });
 
   // Generic wrapper for custom SVG-like elements. Rendering is provided via
