@@ -885,7 +885,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
           width={svgWidth}
           height={svgHeight}
           viewBox={viewBox}
-          className="border border-black/20 bg-transparent absolute"
+          className="designer-svg border border-black/20 bg-transparent absolute select-none"
           onPointerDown={onCanvasPointerDown}
           onClick={(e) => {
             const target = e.target as Element | null;

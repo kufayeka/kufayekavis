@@ -10,49 +10,38 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
 import type { DesignerEngine, DesignerState } from "../../core/engine";
-
-function cssEscape(value: string): string {
-  // CSS.escape is not available in all runtimes/types by default.
-  // This minimal escape is sufficient for our generated element ids.
-  return value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
-}
-
-function focusElementInCanvas(elementId: string) {
-  const node = document.querySelector(`[data-el-id="${cssEscape(elementId)}"]`) as Element | null;
-  if (!node) return;
-
-  const scroller = (node.closest?.('[data-designer-scroller="1"]') as HTMLElement | null) ?? null;
-  if (!scroller) {
-    node.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
-    return;
-  }
-
-  const safeLeft = Number(scroller.dataset.safeLeft ?? 0);
-  const safeRight = Number(scroller.dataset.safeRight ?? 0);
-  const safeTop = Number(scroller.dataset.safeTop ?? 0);
-  const safeBottom = Number(scroller.dataset.safeBottom ?? 0);
-
-  const safeWidth = Math.max(0, scroller.clientWidth - safeLeft - safeRight);
-  const safeHeight = Math.max(0, scroller.clientHeight - safeTop - safeBottom);
-
-  const nodeRect = node.getBoundingClientRect();
-  const scrollerRect = scroller.getBoundingClientRect();
-
-  // Current element center position within the scroller's visible client area.
-  const centerX = nodeRect.left - scrollerRect.left + nodeRect.width / 2;
-  const centerY = nodeRect.top - scrollerRect.top + nodeRect.height / 2;
-
-  // Desired center position within the *safe* viewport (excluding overlay panels).
-  const targetCenterX = safeLeft + safeWidth / 2;
-  const targetCenterY = safeTop + safeHeight / 2;
-
-  const nextLeft = scroller.scrollLeft + (centerX - targetCenterX);
-  const nextTop = scroller.scrollTop + (centerY - targetCenterY);
-
-  scroller.scrollTo({ left: nextLeft, top: nextTop, behavior: "smooth" });
-}
+import { getElementBBox } from "../../core/geometry";
+import { clamp } from "../../core/math";
 
 export function ElementsPanel({ engine, state }: { engine: DesignerEngine; state: DesignerState }) {
+  const focusElementInCanvas = (elementId: string) => {
+    const el = state.doc.elements[elementId];
+    if (!el) return;
+
+    const scroller = document.querySelector<HTMLElement>("[data-designer-scroller='1']");
+    if (!scroller) return;
+
+    const safeLeft = Number(scroller.dataset.safeLeft ?? 0);
+    const safeRight = Number(scroller.dataset.safeRight ?? 0);
+    const safeTop = Number(scroller.dataset.safeTop ?? 0);
+    const safeBottom = Number(scroller.dataset.safeBottom ?? 0);
+
+    const visibleW = Math.max(1, scroller.clientWidth - safeLeft - safeRight);
+    const visibleH = Math.max(1, scroller.clientHeight - safeTop - safeBottom);
+
+    const box = getElementBBox(el, state.doc);
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+    const scale = state.zoom.scale;
+
+    const newPanX = centerX - visibleW / (2 * scale);
+    const newPanY = centerY - visibleH / (2 * scale);
+    const maxPanX = Math.max(0, state.doc.canvas.width - visibleW / scale);
+    const maxPanY = Math.max(0, state.doc.canvas.height - visibleH / scale);
+
+    engine.setZoom({ panX: clamp(newPanX, 0, maxPanX), panY: clamp(newPanY, 0, maxPanY) });
+  };
+
   const elements = Object.values(state.doc.elements)
     .filter(Boolean)
     .slice()

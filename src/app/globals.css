@@ -29,3 +29,10 @@ html,
 body {
   height: 100%;
 }
+
+/* Canvas is not a document editor: prevent text selection/highlight inside SVG canvas. */
+.designer-svg,
+.designer-svg * {
+  -webkit-user-select: none;
+  user-select: none;
+}
