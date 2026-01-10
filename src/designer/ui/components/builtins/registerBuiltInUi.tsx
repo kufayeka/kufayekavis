@@ -6,6 +6,7 @@ import { registerTopPanelProjectIO } from "../../features/topPanel/projectIO";
 import { registerTopPanelViewModeToggle } from "../../features/topPanel/viewMode";
 import { registerTopPanelEditActions } from "../../features/topPanel/editActions";
 import { registerLeftPanelPaletteSection } from "../../features/panels/paletteSection";
+import { registerLeftPanelElementsTab } from "../../features/panels/elementsTab";
 import { registerRightPanelPropertiesSection } from "../../features/panels/propertiesSection";
 
 export function registerBuiltInUiContributions(opts: {
@@ -19,6 +20,7 @@ export function registerBuiltInUiContributions(opts: {
   disposers.push(...registerTopPanelViewModeToggle({ host }));
   disposers.push(...registerTopPanelEditActions({ host }));
   disposers.push(...registerLeftPanelPaletteSection({ host }));
+  disposers.push(...registerLeftPanelElementsTab({ host }));
   disposers.push(...registerRightPanelPropertiesSection({ host }));
 
   return disposers;

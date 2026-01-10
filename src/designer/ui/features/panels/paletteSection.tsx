@@ -10,10 +10,10 @@ export function registerLeftPanelPaletteSection(opts: { host: DesignerHost }): A
   const disposers: Array<() => void> = [];
 
   disposers.push(
-    host.registry.registerLeftPanelSection({
+    host.registry.registerLeftPanelTab({
       id: "builtin.left.palette",
-      title: "Palette",
-      description: "Tools and elements",
+      slot: 1,
+      label: "Palette",
       order: 10,
       render: (ctxUnknown: unknown) => {
         const ctx = ctxUnknown as LeftPanelCtx;

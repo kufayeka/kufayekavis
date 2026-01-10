@@ -872,6 +872,11 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
   return (
     <div
       ref={scrollRef}
+      data-designer-scroller="1"
+      data-safe-left={overlayInsets.left}
+      data-safe-right={overlayInsets.right}
+      data-safe-top={overlayInsets.top}
+      data-safe-bottom={overlayInsets.bottom}
       className="h-full w-full relative overflow-auto overscroll-contain bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)]"
     >
       <div ref={contentRef} className="relative min-w-full min-h-full">

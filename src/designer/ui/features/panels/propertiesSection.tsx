@@ -9,10 +9,10 @@ export function registerRightPanelPropertiesSection(opts: { host: DesignerHost }
   const disposers: Array<() => void> = [];
 
   disposers.push(
-    host.registry.registerRightPanelSection({
+    host.registry.registerRightPanelTab({
       id: "builtin.right.properties",
-      title: "Properties",
-      description: "Selection and plugin tools",
+      slot: 1,
+      label: "Properties",
       order: 10,
       when: (ctxUnknown: unknown) => {
         const ctx = ctxUnknown as RightPanelCtx;

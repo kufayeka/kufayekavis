@@ -56,11 +56,31 @@ export type LeftPanelSection = {
   render: (ctx: unknown) => unknown;
 };
 
+export type PanelTabSlot = 1 | 2 | 3 | 4 | 5;
+
+export type LeftPanelTab = {
+  id: string;
+  slot: PanelTabSlot;
+  label: string;
+  order?: number;
+  when?: UiWhen;
+  render: (ctx: unknown) => unknown;
+};
+
 export type RightPanelSection = {
   id: string;
   title: string;
   description?: string;
   size?: UiSize;
+  order?: number;
+  when?: UiWhen;
+  render: (ctx: unknown) => unknown;
+};
+
+export type RightPanelTab = {
+  id: string;
+  slot: PanelTabSlot;
+  label: string;
   order?: number;
   when?: UiWhen;
   render: (ctx: unknown) => unknown;
@@ -125,7 +145,9 @@ export class DesignerRegistry {
   private propertiesSections: PropertiesSection[] = [];
   private topRibbonItems: TopRibbonItem[] = [];
   private leftPanelSections: LeftPanelSection[] = [];
+  private leftPanelTabs: LeftPanelTab[] = [];
   private rightPanelSections: RightPanelSection[] = [];
+  private rightPanelTabs: RightPanelTab[] = [];
   private bottomBarItems: BottomBarItem[] = [];
   private canvasOverlayItems: CanvasOverlayItem[] = [];
   private dialogs: DialogDefinition[] = [];
@@ -229,6 +251,20 @@ export class DesignerRegistry {
     };
   }
 
+  getLeftPanelTabs(): readonly LeftPanelTab[] {
+    return this.leftPanelTabs;
+  }
+
+  registerLeftPanelTab(tab: LeftPanelTab): () => void {
+    this.leftPanelTabs = [...this.leftPanelTabs.filter((t) => t.id !== tab.id), tab];
+    this.changed();
+    return () => {
+      const before = this.leftPanelTabs.length;
+      this.leftPanelTabs = this.leftPanelTabs.filter((t) => t.id !== tab.id);
+      if (this.leftPanelTabs.length !== before) this.changed();
+    };
+  }
+
   // ---- Right panel ----
 
   getRightPanelSections(): readonly RightPanelSection[] {
@@ -242,6 +278,20 @@ export class DesignerRegistry {
       const before = this.rightPanelSections.length;
       this.rightPanelSections = this.rightPanelSections.filter((s) => s.id !== section.id);
       if (this.rightPanelSections.length !== before) this.changed();
+    };
+  }
+
+  getRightPanelTabs(): readonly RightPanelTab[] {
+    return this.rightPanelTabs;
+  }
+
+  registerRightPanelTab(tab: RightPanelTab): () => void {
+    this.rightPanelTabs = [...this.rightPanelTabs.filter((t) => t.id !== tab.id), tab];
+    this.changed();
+    return () => {
+      const before = this.rightPanelTabs.length;
+      this.rightPanelTabs = this.rightPanelTabs.filter((t) => t.id !== tab.id);
+      if (this.rightPanelTabs.length !== before) this.changed();
     };
   }
 

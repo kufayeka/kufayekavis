@@ -6,7 +6,7 @@ import type { DesignerEngine, DesignerState } from "../../../designer/core/engin
 import type { DesignerHost } from "../../../designer/core/host";
 import type { ImageElement } from "../../../designer/core/types";
 import { Row, numberInput, textInput } from "../../../designer/ui/components/properties/controls";
-import { Button, ButtonGroup, Checkbox, FormControlLabel, MenuItem, TextField } from "@mui/material";
+import { Button, ButtonGroup, MenuItem, TextField } from "@mui/material";
 import { ColorInput } from "../../../designer/ui/components/properties/controls";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
