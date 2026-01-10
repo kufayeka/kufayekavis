@@ -35,14 +35,14 @@ export function RightPanel({ engine, state }: { engine: DesignerEngine; state: D
 
   return (
     <div className="w-[22vw] h-full border-l border-black/10 overflow-auto">
-      <div className="p-3 space-y-4">
+      <div className="p-3 space-y-4 mb-4">
         {visible.map((s) => (
           <div key={s.id} className="rounded border border-black/10 overflow-hidden">
             <div className="px-3 py-2 border-b border-black/10">
               <div className="font-medium text-sm">{s.title}</div>
               {s.description && <div className="text-xs text-black/60 mt-0.5">{s.description}</div>}
             </div>
-            <div className="p-3">{s.render(ctx) as React.ReactNode}</div>
+            <div className="p-1 mb-50">{s.render(ctx) as React.ReactNode}</div>
           </div>
         ))}
       </div>

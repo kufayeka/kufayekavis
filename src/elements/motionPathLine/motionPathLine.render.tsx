@@ -32,7 +32,9 @@ function MotionPathLineInner({ el }: { el: CustomElement }) {
     if (p.particlePlacement === "single") return 1;
     // Interpret gap as empty spacing BETWEEN particles; center-to-center step becomes (size + gap).
     const stepPx = Math.max(1, p.particleSize + Math.max(0, p.particleGap));
-    const n = Math.floor(lineLength / stepPx);
+    // Use rounding to avoid a big "remainder" segment that looks like particle grouping.
+    // Actual pixel spacing becomes (totalLength / n), which stays uniform.
+    const n = Math.round(lineLength / stepPx);
     // Safety clamp to avoid creating thousands of nodes.
     return Math.max(1, Math.min(80, n));
   }, [p.particlePlacement, p.particleGap, p.particleSize, lineLength]);
@@ -53,7 +55,6 @@ function MotionPathLineInner({ el }: { el: CustomElement }) {
     const nodes = particleRefs.current.filter(Boolean) as SVGElement[];
     if (nodes.length === 0) return;
 
-    const stepPx = p.particlePlacement === "along" ? Math.max(1, p.particleSize + Math.max(0, p.particleGap)) : 0;
     const duration = Math.max(0.05, p.particleSpeed); // seconds per traversal (by design)
 
     let totalLength = 1;
@@ -64,7 +65,9 @@ function MotionPathLineInner({ el }: { el: CustomElement }) {
     }
 
     const forward = p.particleDirection !== "reverse";
-    const stepProgress = p.particlePlacement === "along" ? stepPx / totalLength : 0;
+    // IMPORTANT: Keep gaps uniform by distributing particles evenly along [0..1).
+    // Gap input only controls how many particles we choose to place.
+    const stepProgress = p.particlePlacement === "along" && nodes.length > 0 ? 1 / nodes.length : 0;
 
     const setParticleAtProgress = (node: SVGElement, progress01: number) => {
       const t = ((progress01 % 1) + 1) % 1;

@@ -6,6 +6,11 @@ export type MotionPathLineDirection = "forward" | "reverse";
 export type MotionPathLineParticleShape = "circle" | "rect";
 export type MotionPathLineParticlePlacement = "single" | "along";
 
+// For UI + remote control (exact string values)
+export const MOTION_PATH_LINE_DIRECTIONS: readonly MotionPathLineDirection[] = ["forward", "reverse"] as const;
+export const MOTION_PATH_LINE_PARTICLE_SHAPES: readonly MotionPathLineParticleShape[] = ["circle", "rect"] as const;
+export const MOTION_PATH_LINE_PARTICLE_PLACEMENTS: readonly MotionPathLineParticlePlacement[] = ["single", "along"] as const;
+
 export type MotionPathLineProps = {
   // Geometry in local SVG coordinates (inside the element's <svg viewBox>)
   x1: number;

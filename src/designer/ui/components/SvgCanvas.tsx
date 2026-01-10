@@ -108,13 +108,24 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
     (clientX: number, clientY: number) => {
       const svg = svgRef.current;
       if (!svg) return { x: 0, y: 0 };
+      // Prefer the browser's own coordinate transform (accounts for zoom/scroll/borders precisely).
+      const ctm = svg.getScreenCTM();
+      if (ctm) {
+        const pt = svg.createSVGPoint();
+        pt.x = clientX;
+        pt.y = clientY;
+        const p = pt.matrixTransform(ctm.inverse());
+        return { x: p.x, y: p.y };
+      }
+
+      // Fallback: map client pixels into SVG viewBox units (canvas coordinates)
       const rect = svg.getBoundingClientRect();
-      // Map client pixels into SVG viewBox units (canvas coordinates)
       const scaleX = state.doc.canvas.width / rect.width;
       const scaleY = state.doc.canvas.height / rect.height;
-      const x = (clientX - rect.left) * scaleX;
-      const y = (clientY - rect.top) * scaleY;
-      return { x, y };
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+      };
     },
     [state.doc.canvas.height, state.doc.canvas.width],
   );

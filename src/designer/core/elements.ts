@@ -119,8 +119,6 @@ export function createBuiltInElementRegistry(): ElementRegistry {
     id: "free",
     type: "free",
     label: "Free Draw",
-    palette: { label: "Free Draw", order: 35 },
-    createInput: (pt) => ({ type: "free", d: `M ${pt.x} ${pt.y} L ${pt.x + 80} ${pt.y + 40}` }),
   });
 
   reg.register({

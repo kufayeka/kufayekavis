@@ -177,3 +177,64 @@ Kalau ada logic yang sama muncul di 2 tempat (properties vs definition), itu ind
 - Renderer (Model A wrapper): `src/designer/ui/components/svgCanvas/renderTree.tsx`
 - Properties controls: `src/designer/ui/components/properties/controls.tsx`
 - Properties ctx type: `src/designer/ui/components/properties/types.ts`
+
+---
+
+## 6) Remote Control (MQTT) – cara ngatur semua properties
+
+Remote control itu **tidak** punya daftar khusus per-element.
+Aturannya simple:
+
+1) Untuk element **native** (`rect/circle/line/...`) gunakan `updateElement` dan patch field root.
+
+2) Untuk element **custom** (`type: "custom"`) kamu bisa:
+- pakai `updateCustomProps` (paling jelas), atau
+- pakai `updateElement` dan kirim key props langsung (mis. `animate`, `particleDirection`, dll). Sistem akan otomatis memasukkan key yang tidak dikenal sebagai root field ke `props`.
+
+### Contoh: motionPathLine
+
+Set direction (harus exact string):
+```js
+msg.payload = {
+  action: "updateElement",
+  payload: {
+    id: "custom_axRKCXj_U0",
+    patch: {
+      particleDirection: "reverse" // "forward" | "reverse"
+    }
+  }
+}
+return msg;
+```
+
+Toggle animate:
+```js
+msg.payload = {
+  action: "updateElement",
+  payload: {
+    id: "custom_axRKCXj_U0",
+    patch: {
+      animate: true
+    }
+  }
+}
+return msg;
+```
+
+Set mode + gap:
+```js
+msg.payload = {
+  action: "updateElement",
+  payload: {
+    id: "custom_axRKCXj_U0",
+    patch: {
+      particlePlacement: "along", // "single" | "along"
+      particleGap: 24
+    }
+  }
+}
+return msg;
+```
+
+### Tips debugging
+- Panggil `getElement` dulu untuk lihat struktur props yang benar, lalu patch key yang sama.
