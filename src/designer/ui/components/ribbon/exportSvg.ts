@@ -3,6 +3,43 @@ import type { DesignerAPI } from "../../../core/api";
 import type { DesignerDocument, DesignerElement, CustomElement, ImageElement, TextElement, GroupElement, RectElement, CircleElement, LineElement, FreeDrawElement } from "../../../core/types";
 import type { DesignerHost } from "../../../core/host";
 
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n));
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function imageFilterIsActive(im: ImageElement): boolean {
+  const f = im.imageFilters;
+  if (!f) return false;
+  return (
+    (f.brightness !== undefined && f.brightness !== 1) ||
+    (f.contrast !== undefined && f.contrast !== 1) ||
+    (f.saturate !== undefined && f.saturate !== 1) ||
+    (f.grayscale !== undefined && f.grayscale !== 0) ||
+    (f.blur !== undefined && f.blur !== 0)
+  );
+}
+
+function buildImageFilterDef(im: ImageElement): string {
+  const f = im.imageFilters ?? {};
+  const brightness = clamp(typeof f.brightness === "number" ? f.brightness : 1, 0, 3);
+  const contrast = clamp(typeof f.contrast === "number" ? f.contrast : 1, 0, 3);
+  const saturate = clamp(typeof f.saturate === "number" ? f.saturate : 1, 0, 3);
+  const grayscale = clamp01(typeof f.grayscale === "number" ? f.grayscale : 0);
+  const blur = clamp(typeof f.blur === "number" ? f.blur : 0, 0, 50);
+
+  const slope = brightness * contrast;
+  const intercept = 0.5 - 0.5 * contrast;
+  const sat = clamp01(saturate);
+  const finalSat = clamp01(sat * (1 - grayscale));
+  const blurNode = blur > 0 ? `\n    <feGaussianBlur stdDeviation=\"${blur}\" />` : "";
+
+  return `<filter id=\"imgf-${escapeXml(String(im.id))}\" color-interpolation-filters=\"sRGB\">\n    <feColorMatrix type=\"saturate\" values=\"${finalSat}\" />\n    <feComponentTransfer>\n      <feFuncR type=\"linear\" slope=\"${slope}\" intercept=\"${intercept}\" />\n      <feFuncG type=\"linear\" slope=\"${slope}\" intercept=\"${intercept}\" />\n      <feFuncB type=\"linear\" slope=\"${slope}\" intercept=\"${intercept}\" />\n      <feFuncA type=\"linear\" slope=\"1\" intercept=\"0\" />\n    </feComponentTransfer>${blurNode}\n  </filter>`;
+}
+
 function escapeXml(text: string): string {
   return String(text ?? "")
     .replace(/&/g, "&amp;")
@@ -71,7 +108,8 @@ function renderElementToSvg(
     const cy = im.y + im.height / 2;
     const transform = buildTransformAttr(im.rotation, im.flipH, im.flipV, cx, cy);
     const praAttr = pra ? ` preserveAspectRatio=\"${escapeXml(String(pra))}\"` : "";
-    return `<image href=\"${escapeXml(im.href)}\" x=\"${im.x}\" y=\"${im.y}\" width=\"${im.width}\" height=\"${im.height}\"${praAttr} ${attrs.join(" ")} ${transform} />`;
+    const filterAttr = imageFilterIsActive(im) ? ` filter=\"url(#imgf-${escapeXml(String(im.id))})\"` : "";
+    return `<image href=\"${escapeXml(im.href)}\" x=\"${im.x}\" y=\"${im.y}\" width=\"${im.width}\" height=\"${im.height}\"${praAttr}${filterAttr} ${attrs.join(" ")} ${transform} />`;
   }
   if (el.type === "text") {
     const t = el as TextElement;
@@ -130,11 +168,33 @@ export function exportProjectToSvgString(deps: {
   const doc = deps.document;
   const w = doc.canvas.width;
   const h = doc.canvas.height;
+
+  const imageDefs = doc.rootIds
+    .map((id) => doc.elements[id])
+    .filter(Boolean)
+    .flatMap((root) => {
+      const walk = (el: DesignerElement): DesignerElement[] => {
+        if (el.type === "group") {
+          const g = el as GroupElement;
+          const kids = g.childIds.map((cid) => doc.elements[cid]).filter(Boolean) as DesignerElement[];
+          return [el, ...kids.flatMap(walk)];
+        }
+        return [el];
+      };
+      return walk(root as DesignerElement);
+    })
+    .filter((el): el is ImageElement => Boolean(el) && (el as DesignerElement).type === "image")
+    .filter((im) => imageFilterIsActive(im))
+    .map((im) => buildImageFilterDef(im))
+    .join("\n");
+
+  const defsBlock = imageDefs.trim() ? `<defs>\n${imageDefs}\n</defs>\n` : "";
+
   const content = doc.rootIds
     .map((id) => doc.elements[id])
     .filter(Boolean)
     .map((el) => renderElementToSvg(el as DesignerElement, doc, { engine: deps.engine, api: deps.api, host: deps.host }))
     .join("\n");
 
-  return `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${w}\" height=\"${h}\" viewBox=\"0 0 ${w} ${h}\">\n${content}\n</svg>`;
+  return `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${w}\" height=\"${h}\" viewBox=\"0 0 ${w} ${h}\">\n${defsBlock}${content}\n</svg>`;
 }

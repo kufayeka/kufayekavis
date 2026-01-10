@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { gsap } from "gsap";
+import { Button, Paper, TextField, Typography } from "@mui/material";
 
 import type { DesignerState } from "../../../core/engine";
 import { getBBoxCenter } from "../../../core/geometry";
@@ -488,33 +489,25 @@ export function MagnifierOverlay({
 }) {
   const [percent, setPercent] = useState(initialPercent);
   return (
-    <div className="rounded border border-black/20 bg-white p-2 shadow">
-      <div className="text-xs text-black/70 mb-1">Zoom</div>
-      <div className="flex items-center gap-2">
-        <button className="px-2 py-1 rounded border" onClick={() => setPercent((p) => Math.max(10, p - 10))}>
-          -
-        </button>
-        <input
+    <Paper variant="outlined" className="p-2">
+      <Typography variant="caption" className="text-black/70">Zoom</Typography>
+      <div className="flex items-center gap-2 mt-1">
+        <Button onClick={() => setPercent((p) => Math.max(10, p - 10))}>-</Button>
+        <TextField
           title="magnifier-percent"
           aria-label="Magnifier percent"
-          className="w-16 px-2 py-1 rounded border text-right"
+          className="w-20"
           value={percent}
           onChange={(e) => setPercent(Number(e.target.value || 0))}
           type="number"
         />
         <div className="text-sm">%</div>
-        <button className="px-2 py-1 rounded border" onClick={() => setPercent((p) => Math.min(800, p + 10))}>
-          +
-        </button>
+        <Button onClick={() => setPercent((p) => Math.min(800, p + 10))}>+</Button>
       </div>
       <div className="flex items-center gap-2 mt-2">
-        <button className="px-2 py-1 rounded border" onClick={() => onApply(percent)}>
-          Apply
-        </button>
-        <button className="px-2 py-1 rounded border" onClick={onCancel}>
-          Cancel
-        </button>
+        <Button onClick={() => onApply(percent)}>Apply</Button>
+        <Button onClick={onCancel}>Cancel</Button>
       </div>
-    </div>
+    </Paper>
   );
 }

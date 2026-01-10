@@ -7,6 +7,38 @@ import type { DesignerHost } from "../../../core/host";
 import { exportProjectToSvgString } from "../../components/ribbon/exportSvg";
 import { downloadSvg, downloadText } from "../utils/download";
 
+function buildPublishJsonText(rawJsonText: string): string {
+  try {
+    const parsed = JSON.parse(rawJsonText) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return rawJsonText;
+    const doc = parsed as Record<string, unknown>;
+
+    // Online publish is for viewing; remove undo history (can be huge).
+    if (doc.history && typeof doc.history === "object" && !Array.isArray(doc.history)) {
+      const hist = doc.history as Record<string, unknown>;
+      hist.past = [];
+      hist.future = [];
+      doc.history = hist;
+    }
+
+    // Background removal stores `originalHref` which can duplicate large data URLs.
+    if (doc.elements && typeof doc.elements === "object" && !Array.isArray(doc.elements)) {
+      const els = doc.elements as Record<string, unknown>;
+      for (const key of Object.keys(els)) {
+        const el = els[key];
+        if (!el || typeof el !== "object" || Array.isArray(el)) continue;
+        const rec = el as Record<string, unknown>;
+        if (typeof rec.originalHref === "string") delete rec.originalHref;
+      }
+      doc.elements = els;
+    }
+
+    return JSON.stringify(doc);
+  } catch {
+    return rawJsonText;
+  }
+}
+
 function ImportJsonButton({ engine }: { engine: DesignerEngine }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -96,11 +128,11 @@ export function registerTopPanelProjectIO(opts: { host: DesignerHost; engine: De
       onClick: () => {
         void (async () => {
           try {
-            const jsonText = engine.exportProjectJson();
+            const jsonText = buildPublishJsonText(engine.exportProjectJson());
             const res = await fetch("/api/onlineProjects", {
               method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ jsonText }),
+              headers: { "content-type": "text/plain; charset=utf-8" },
+              body: jsonText,
             });
             const data = (await res.json().catch(() => null)) as unknown;
             if (!data || typeof data !== "object") throw new Error("Invalid response");

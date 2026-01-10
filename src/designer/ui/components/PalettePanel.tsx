@@ -4,6 +4,7 @@ import type { ToolType } from "../../core/types";
 import { useDesignerHost } from "../hooks/useDesignerHost";
 import { useSyncExternalStore } from "react";
 import clsx from "clsx";
+import { Button } from "@mui/material";
 
 const tools: Array<{ tool: ToolType; label: string; draggable?: boolean; dragId?: string }> = [
   { tool: "select", label: "Select", draggable: false },
@@ -30,18 +31,15 @@ export function PalettePanel({
 
   return (
     <div>
-      <div className="font-semibold mb-2">Palette</div>
-      <div className="text-xs text-black/60 mt-2 leading-5">
+      <div className="text-xs text-black/60 leading-5">
         Drag tool → canvas to place. Image: you can also drag an image file from OS → canvas.
       </div>
       <div className="grid grid-cols-2 gap-2">
         {tools.map((t) => (
-          <button
+          <Button
             key={t.tool}
-            className={clsx(
-              "px-3 py-2 rounded border text-left",
-              activeTool === t.tool ? "border-black/40 bg-black/5" : "border-black/15 hover:bg-black/5",
-            )}
+            variant={activeTool === t.tool ? "contained" : "outlined"}
+            className={clsx("justify-start")}
             onClick={() => onToolChange(t.tool)}
             draggable={Boolean(t.draggable)}
             onDragStart={(e) => {
@@ -51,13 +49,14 @@ export function PalettePanel({
             }}
           >
             {t.label}
-          </button>
+          </Button>
         ))}
 
         {visibleElementItems.map((it) => (
-          <button
+          <Button
             key={it.id}
-            className={clsx("px-3 py-2 rounded border text-left", "border-black/15 hover:bg-black/5")}
+            variant={activeTool === it.id ? "contained" : "outlined"}
+            className={clsx("justify-start")}
             onClick={() => onToolChange(it.id)}
             draggable
             onDragStart={(e) => {
@@ -66,7 +65,7 @@ export function PalettePanel({
             }}
           >
             {it.label}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

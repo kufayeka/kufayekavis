@@ -6,6 +6,7 @@ import type { DesignerEngine, DesignerState } from "../../../designer/core/engin
 import type { DesignerHost } from "../../../designer/core/host";
 import type { TextElement } from "../../../designer/core/types";
 import { ColorInput, Row, numberInput, textAreaInput } from "../../../designer/ui/components/properties/controls";
+import { Button, ButtonGroup, MenuItem, TextField } from "@mui/material";
 
 type PropertiesCtx = {
   engine: DesignerEngine;
@@ -39,18 +40,16 @@ export function renderTextProperties(ctxUnknown: unknown): React.ReactNode {
         id={`${baseId}-font-weight`}
         label="Weight"
         control={
-          <select
+          <TextField
             id={`${baseId}-font-weight`}
-            aria-labelledby={`${baseId}-font-weight-label`}
-            aria-label="Weight"
-            title="Weight"
+            select
+            fullWidth
             value={t.fontWeight}
-            onChange={(e) => engine.updateElement(t.id, { fontWeight: e.target.value })}
-            className="px-2 py-1 rounded border border-black/15 w-full"
+            onChange={(e) => engine.updateElement(t.id, { fontWeight: String(e.target.value) })}
           >
-            <option value="normal">Normal</option>
-            <option value="bold">Bold</option>
-          </select>
+            <MenuItem value="normal">Normal</MenuItem>
+            <MenuItem value="bold">Bold</MenuItem>
+          </TextField>
         }
       />
       <Row
@@ -59,18 +58,11 @@ export function renderTextProperties(ctxUnknown: unknown): React.ReactNode {
         control={<ColorInput id={`${baseId}-font-color`} value={t.fill} onChange={(v) => engine.updateElement(t.id, { fill: v })} />}
       />
       <div className="col-span-2 flex items-center gap-2">
-        <button className="px-2 py-1 rounded border" onClick={() => engine.updateElement(t.id, { fontWeight: t.fontWeight === "bold" ? "normal" : "bold" })}>
-          Bold
-        </button>
-        <button className="px-2 py-1 rounded border" onClick={() => engine.updateElement(t.id, { fontStyle: t.fontStyle === "italic" ? "normal" : "italic" })}>
-          Italic
-        </button>
-        <button
-          className="px-2 py-1 rounded border"
-          onClick={() => engine.updateElement(t.id, { textDecoration: t.textDecoration === "underline" ? "none" : "underline" })}
-        >
-          Underline
-        </button>
+        <ButtonGroup>
+          <Button onClick={() => engine.updateElement(t.id, { fontWeight: t.fontWeight === "bold" ? "normal" : "bold" })}>Bold</Button>
+          <Button onClick={() => engine.updateElement(t.id, { fontStyle: t.fontStyle === "italic" ? "normal" : "italic" })}>Italic</Button>
+          <Button onClick={() => engine.updateElement(t.id, { textDecoration: t.textDecoration === "underline" ? "none" : "underline" })}>Underline</Button>
+        </ButtonGroup>
       </div>
     </div>
   );

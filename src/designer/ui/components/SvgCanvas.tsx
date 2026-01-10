@@ -444,7 +444,18 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
-  }, [engine, clientToCanvas, finalizeMarqueeSelection, snapIfEnabled]);
+  }, [
+    clientToCanvas,
+    contentLayout.originOffsetX,
+    contentLayout.originOffsetY,
+    engine,
+    finalizeMarqueeSelection,
+    overlayInsets.bottom,
+    overlayInsets.left,
+    overlayInsets.right,
+    overlayInsets.top,
+    snapIfEnabled,
+  ]);
 
   const onCanvasPointerDown = (e: React.PointerEvent) => {
     // In view mode we don't allow selection/movement, but we still want pointer events
@@ -796,13 +807,73 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
 
   const gridPatternId = "gridPattern";
 
+  const imageFilterDefs = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    const doc = state.doc;
+
+    for (const id of Object.keys(doc.elements)) {
+      const el = doc.elements[id as ElementId] as DesignerElement | undefined;
+      if (!el || el.type !== "image") continue;
+      const img = el as unknown as { id: string; imageFilters?: Record<string, unknown> };
+      const f = (img.imageFilters ?? {}) as {
+        brightness?: number;
+        contrast?: number;
+        saturate?: number;
+        grayscale?: number;
+        blur?: number;
+      };
+
+      const isActive =
+        (f.brightness !== undefined && f.brightness !== 1) ||
+        (f.contrast !== undefined && f.contrast !== 1) ||
+        (f.saturate !== undefined && f.saturate !== 1) ||
+        (f.grayscale !== undefined && f.grayscale !== 0) ||
+        (f.blur !== undefined && f.blur !== 0);
+      if (!isActive) continue;
+
+      const brightness = Math.max(0, Math.min(3, f.brightness ?? 1));
+      const contrast = Math.max(0, Math.min(3, f.contrast ?? 1));
+      const saturate = Math.max(0, Math.min(3, f.saturate ?? 1));
+      const grayscale = Math.max(0, Math.min(1, f.grayscale ?? 0));
+      const blur = Math.max(0, Math.min(50, f.blur ?? 0));
+
+      // Approximate CSS-like filters with SVG primitives.
+      // - Saturation: feColorMatrix type=saturate
+      // - Brightness/contrast: feComponentTransfer linear
+      // - Blur: feGaussianBlur
+      const slope = brightness * contrast;
+      const intercept = 0.5 - 0.5 * contrast;
+      const sat = Math.max(0, Math.min(1, saturate));
+      const sat2 = sat * (1 - grayscale);
+      const finalSat = Math.max(0, Math.min(1, sat2));
+
+      out.push(
+        <filter key={img.id} id={`imgf-${img.id}`} colorInterpolationFilters="sRGB">
+          <feColorMatrix type="saturate" values={String(finalSat)} />
+          <feComponentTransfer>
+            <feFuncR type="linear" slope={`${slope}`} intercept={`${intercept}`} />
+            <feFuncG type="linear" slope={`${slope}`} intercept={`${intercept}`} />
+            <feFuncB type="linear" slope={`${slope}`} intercept={`${intercept}`} />
+            <feFuncA type="linear" slope="1" intercept="0" />
+          </feComponentTransfer>
+          {blur > 0 ? <feGaussianBlur stdDeviation={`${blur}`} /> : null}
+        </filter>,
+      );
+    }
+
+    return out;
+  }, [state.doc]);
+
   const canvasEventTopic = useMemo(() => {
     // Plugin can override this via api.publishEvent mapping; keep a stable default.
     return "default/events";
   }, []);
 
   return (
-    <div ref={scrollRef} className="h-full w-full relative overflow-auto overscroll-contain">
+    <div
+      ref={scrollRef}
+      className="h-full w-full relative overflow-auto overscroll-contain bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)]"
+    >
       <div ref={contentRef} className="relative min-w-full min-h-full">
         <svg
           ref={svgRef}
@@ -838,6 +909,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
                 strokeWidth="1"
               />
             </pattern>
+            {imageFilterDefs}
           </defs>
           <g>
             <rect x={0} y={0} width={state.doc.canvas.width} height={state.doc.canvas.height} fill={state.doc.canvas.background} />
@@ -922,7 +994,6 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
             onApply={(percent) => {
               const scroller = scrollRef.current;
               if (!scroller) return setPendingMagnifier(null);
-              const containerRect = scroller.getBoundingClientRect();
               const visibleW = Math.max(1, scroller.clientWidth - overlayInsets.left - overlayInsets.right);
               const visibleH = Math.max(1, scroller.clientHeight - overlayInsets.top - overlayInsets.bottom);
               const newScale = Math.max(0.1, Math.min(8, percent / 100));

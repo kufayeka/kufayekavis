@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import mqtt, { type IClientOptions, type MqttClient } from "mqtt";
 import { match } from "ts-pattern";
 import { z } from "zod";
+import { Alert, Button, Checkbox, FormControlLabel, TextField } from "@mui/material";
 
 import type { DesignerPlugin } from "../core/plugins";
 import type { DesignerAPI } from "../core/api";
@@ -571,107 +572,93 @@ function SettingsDialog({ api }: { api: DesignerAPI }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <label className="space-y-1">
-          <div className="text-xs font-medium">Broker WS URL</div>
-          <input
-            className="w-full px-2 py-1.5 rounded border border-black/15"
-            value={settings.url}
-            onChange={(e) => setSettings((s) => ({ ...s, url: e.target.value }))}
-            placeholder="ws://host:port/mqtt"
-          />
-        </label>
+        <TextField
+          label="Broker WS URL"
+          value={settings.url}
+          onChange={(e) => setSettings((s) => ({ ...s, url: e.target.value }))}
+          placeholder="ws://host:port/mqtt"
+          fullWidth
+        />
 
-        <label className="space-y-1">
-          <div className="text-xs font-medium">Client ID</div>
-          <input
-            className="w-full px-2 py-1.5 rounded border border-black/15"
-            value={settings.clientId ?? ""}
-            onChange={(e) => setSettings((s) => ({ ...s, clientId: e.target.value }))}
-            placeholder="optional"
-          />
-        </label>
+        <TextField
+          label="Client ID"
+          value={settings.clientId ?? ""}
+          onChange={(e) => setSettings((s) => ({ ...s, clientId: e.target.value }))}
+          placeholder="optional"
+          fullWidth
+        />
 
-        <label className="space-y-1">
-          <div className="text-xs font-medium">Username</div>
-          <input
-            className="w-full px-2 py-1.5 rounded border border-black/15"
-            value={settings.username ?? ""}
-            onChange={(e) => setSettings((s) => ({ ...s, username: e.target.value }))}
-            placeholder="optional"
-          />
-        </label>
+        <TextField
+          label="Username"
+          value={settings.username ?? ""}
+          onChange={(e) => setSettings((s) => ({ ...s, username: e.target.value }))}
+          placeholder="optional"
+          fullWidth
+        />
 
-        <label className="space-y-1">
-          <div className="text-xs font-medium">Password</div>
-          <input
-            className="w-full px-2 py-1.5 rounded border border-black/15"
-            type="password"
-            value={settings.password ?? ""}
-            onChange={(e) => setSettings((s) => ({ ...s, password: e.target.value }))}
-            placeholder="optional"
-          />
-        </label>
+        <TextField
+          label="Password"
+          type="password"
+          value={settings.password ?? ""}
+          onChange={(e) => setSettings((s) => ({ ...s, password: e.target.value }))}
+          placeholder="optional"
+          fullWidth
+        />
 
-        <label className="space-y-1">
-          <div className="text-xs font-medium">Keepalive (s)</div>
-          <input
-            className="w-full px-2 py-1.5 rounded border border-black/15"
-            type="number"
-            min={0}
-            value={settings.keepalive ?? 30}
-            onChange={(e) => setSettings((s) => ({ ...s, keepalive: Number(e.target.value) }))}
-          />
-        </label>
+        <TextField
+          label="Keepalive (s)"
+          type="number"
+          inputProps={{ min: 0 }}
+          value={settings.keepalive ?? 30}
+          onChange={(e) => setSettings((s) => ({ ...s, keepalive: Number(e.target.value) }))}
+          fullWidth
+        />
 
-        <label className="space-y-1">
-          <div className="text-xs font-medium">Reconnect (ms)</div>
-          <input
-            className="w-full px-2 py-1.5 rounded border border-black/15"
-            type="number"
-            min={0}
-            value={settings.reconnectPeriodMs ?? 2000}
-            onChange={(e) => setSettings((s) => ({ ...s, reconnectPeriodMs: Number(e.target.value) }))}
-          />
-        </label>
+        <TextField
+          label="Reconnect (ms)"
+          type="number"
+          inputProps={{ min: 0 }}
+          value={settings.reconnectPeriodMs ?? 2000}
+          onChange={(e) => setSettings((s) => ({ ...s, reconnectPeriodMs: Number(e.target.value) }))}
+          fullWidth
+        />
 
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={settings.clean ?? true}
-            onChange={(e) => setSettings((s) => ({ ...s, clean: e.target.checked }))}
-          />
-          <span className="text-xs">Clean session</span>
-        </label>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={settings.clean ?? true}
+              onChange={(e) => setSettings((s) => ({ ...s, clean: e.target.checked }))}
+            />
+          }
+          label="Clean session"
+        />
       </div>
 
       <div className="rounded border border-black/10 p-3 space-y-2">
         <div className="text-sm font-medium">Remote Control Interface</div>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={settings.remoteControlEnabled ?? true}
-            onChange={(e) => setSettings((s) => ({ ...s, remoteControlEnabled: e.target.checked }))}
-          />
-          <span className="text-xs">Enable remote control subscribe</span>
-        </label>
-        <label className="space-y-1 block">
-          <div className="text-xs font-medium">Remote control topic</div>
-          <input
-            className="w-full px-2 py-1.5 rounded border border-black/15"
-            value={settings.remoteControlTopic ?? ""}
-            onChange={(e) => setSettings((s) => ({ ...s, remoteControlTopic: e.target.value }))}
-            placeholder="scada/rc"
-          />
-        </label>
-        <label className="space-y-1 block">
-          <div className="text-xs font-medium">Response topic (optional)</div>
-          <input
-            className="w-full px-2 py-1.5 rounded border border-black/15"
-            value={settings.remoteControlResponseTopic ?? ""}
-            onChange={(e) => setSettings((s) => ({ ...s, remoteControlResponseTopic: e.target.value }))}
-            placeholder="scada/rc/resp"
-          />
-        </label>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={settings.remoteControlEnabled ?? true}
+              onChange={(e) => setSettings((s) => ({ ...s, remoteControlEnabled: e.target.checked }))}
+            />
+          }
+          label="Enable remote control subscribe"
+        />
+        <TextField
+          label="Remote control topic"
+          value={settings.remoteControlTopic ?? ""}
+          onChange={(e) => setSettings((s) => ({ ...s, remoteControlTopic: e.target.value }))}
+          placeholder="scada/rc"
+          fullWidth
+        />
+        <TextField
+          label="Response topic (optional)"
+          value={settings.remoteControlResponseTopic ?? ""}
+          onChange={(e) => setSettings((s) => ({ ...s, remoteControlResponseTopic: e.target.value }))}
+          placeholder="scada/rc/resp"
+          fullWidth
+        />
         <div className="text-xs text-black/60">
           Message format: <span className="font-mono">{"{"}action, payload{"}"}</span>
         </div>
@@ -679,59 +666,58 @@ function SettingsDialog({ api }: { api: DesignerAPI }) {
 
       <div className="rounded border border-black/10 p-3 space-y-2">
         <div className="text-sm font-medium">Event Output Interface</div>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={settings.eventOutputEnabled ?? true}
-            onChange={(e) => setSettings((s) => ({ ...s, eventOutputEnabled: e.target.checked }))}
-          />
-          <span className="text-xs">Enable event publish</span>
-        </label>
-        <label className="space-y-1 block">
-          <div className="text-xs font-medium">Default event topic</div>
-          <input
-            className="w-full px-2 py-1.5 rounded border border-black/15"
-            value={settings.defaultEventTopic ?? ""}
-            onChange={(e) => setSettings((s) => ({ ...s, defaultEventTopic: e.target.value }))}
-            placeholder="scada/events"
-          />
-        </label>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={settings.eventOutputEnabled ?? true}
+              onChange={(e) => setSettings((s) => ({ ...s, eventOutputEnabled: e.target.checked }))}
+            />
+          }
+          label="Enable event publish"
+        />
+        <TextField
+          label="Default event topic"
+          value={settings.defaultEventTopic ?? ""}
+          onChange={(e) => setSettings((s) => ({ ...s, defaultEventTopic: e.target.value }))}
+          placeholder="scada/events"
+          fullWidth
+        />
         <div className="text-xs text-black/60">
           Elements can override per element via <span className="font-mono">mqttTopic</span>.
         </div>
 
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={settings.forcePublishElementEvents ?? false}
-            onChange={(e) => setSettings((s) => ({ ...s, forcePublishElementEvents: e.target.checked }))}
-          />
-          <span className="text-xs">Force publish element events (ignore per-element flags)</span>
-        </label>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={settings.forcePublishElementEvents ?? false}
+              onChange={(e) => setSettings((s) => ({ ...s, forcePublishElementEvents: e.target.checked }))}
+            />
+          }
+          label="Force publish element events (ignore per-element flags)"
+        />
 
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={settings.forcePublishCanvasEvents ?? false}
-            onChange={(e) => setSettings((s) => ({ ...s, forcePublishCanvasEvents: e.target.checked }))}
-          />
-          <span className="text-xs">Force publish canvas events</span>
-        </label>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={settings.forcePublishCanvasEvents ?? false}
+              onChange={(e) => setSettings((s) => ({ ...s, forcePublishCanvasEvents: e.target.checked }))}
+            />
+          }
+          label="Force publish canvas events"
+        />
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <button
-          className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
+        <Button
           onClick={() => {
             api.setPluginSettings(PLUGIN_ID, settings);
             setTestStatus({ kind: "idle" });
           }}
         >
           Save
-        </button>
+        </Button>
 
-        <button
-          className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
+        <Button
           onClick={async () => {
             setTestStatus({ kind: "testing", message: "Testing..." });
             const mgr = createConnectionManager(api);
@@ -741,21 +727,14 @@ function SettingsDialog({ api }: { api: DesignerAPI }) {
           disabled={testStatus.kind === "testing"}
         >
           Test
-        </button>
+        </Button>
 
         {testStatus.kind !== "idle" && (
-          <div
-            className={
-              "text-xs px-2 py-1 rounded border " +
-              (testStatus.kind === "ok"
-                ? "border-green-600/30 bg-green-50"
-                : testStatus.kind === "error"
-                  ? "border-red-600/30 bg-red-50"
-                  : "border-black/10 bg-black/5")
-            }
+          <Alert
+            severity={testStatus.kind === "ok" ? "success" : testStatus.kind === "error" ? "error" : "info"}
           >
             {testStatus.message ?? ""}
-          </div>
+          </Alert>
         )}
       </div>
     </div>

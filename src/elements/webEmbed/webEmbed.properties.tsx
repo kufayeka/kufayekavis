@@ -6,6 +6,7 @@ import type { CustomElement } from "../../designer/core/types";
 import type { PropertiesSectionRenderCtx } from "../../designer/ui/components/properties/types";
 import { Row, numberInput, normalizeUrl, textInput } from "../../designer/ui/components/properties/controls";
 import { WEB_EMBED_ACTION_IDS } from "./webEmbed.actions";
+import { Button, Checkbox, FormControlLabel } from "@mui/material";
 
 export function renderWebEmbedProperties(ctxUnknown: unknown): React.ReactNode {
   const { api, engine, state } = ctxUnknown as PropertiesSectionRenderCtx;
@@ -51,49 +52,38 @@ export function renderWebEmbedProperties(ctxUnknown: unknown): React.ReactNode {
       />
 
       <div className="col-span-2">
-        <div className="flex items-center gap-2">
-          <input
-            id={allowFullscreenId}
-            type="checkbox"
-            title="Allow Fullscreen"
-            checked={Boolean(props.allowFullscreen)}
-            onChange={(e) => {
-              const newProps = { ...props, allowFullscreen: e.target.checked };
-              engine.updateElement(c.id, { props: newProps });
-            }}
-          />
-          <label htmlFor={allowFullscreenId} className="text-sm">
-            Allow Fullscreen
-          </label>
-        </div>
+        <FormControlLabel
+          control={
+            <Checkbox
+              id={allowFullscreenId}
+              checked={Boolean(props.allowFullscreen)}
+              onChange={(e) => {
+                const newProps = { ...props, allowFullscreen: e.target.checked };
+                engine.updateElement(c.id, { props: newProps });
+              }}
+            />
+          }
+          label="Allow Fullscreen"
+        />
       </div>
       <div className="col-span-2">
-        <div className="flex items-center gap-2">
-          <input
-            id={allowScriptsId}
-            type="checkbox"
-            title="Allow Scripts"
-            checked={Boolean(props.allowScripts)}
-            onChange={(e) => {
-              const newProps = { ...props, allowScripts: e.target.checked };
-              engine.updateElement(c.id, { props: newProps });
-            }}
-          />
-          <label htmlFor={allowScriptsId} className="text-sm">
-            Allow Scripts
-          </label>
-        </div>
+        <FormControlLabel
+          control={
+            <Checkbox
+              id={allowScriptsId}
+              checked={Boolean(props.allowScripts)}
+              onChange={(e) => {
+                const newProps = { ...props, allowScripts: e.target.checked };
+                engine.updateElement(c.id, { props: newProps });
+              }}
+            />
+          }
+          label="Allow Scripts"
+        />
       </div>
 
       <div className="col-span-2 flex gap-2 mt-2">
-        <button
-          className="px-3 py-1 rounded border border-black/15 hover:bg-black/5"
-          onClick={() => {
-            api.callElementAction(c.id, WEB_EMBED_ACTION_IDS.reload);
-          }}
-        >
-          Reload
-        </button>
+        <Button onClick={() => api.callElementAction(c.id, WEB_EMBED_ACTION_IDS.reload)}>Reload</Button>
       </div>
     </div>
   );

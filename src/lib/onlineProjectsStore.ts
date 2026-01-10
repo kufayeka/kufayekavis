@@ -2,7 +2,18 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 
-const MAX_JSON_BYTES = 2 * 1024 * 1024; // 2MB
+// Keep this reasonably small: online publish is meant for a single project snapshot.
+// Note: some hosting providers enforce their own request size limits.
+const MAX_JSON_BYTES = 8 * 1024 * 1024; // 8MB
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "?";
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
+}
 
 function storeDir(): string {
   // Keep it out of /public and /src; this is runtime data.
@@ -28,7 +39,10 @@ export function validateJsonText(jsonText: string): { ok: true } | { ok: false; 
   if (typeof jsonText !== "string") return { ok: false, error: "jsonText must be a string" };
   const trimmed = jsonText.trim();
   if (!trimmed) return { ok: false, error: "jsonText is empty" };
-  if (Buffer.byteLength(trimmed, "utf8") > MAX_JSON_BYTES) return { ok: false, error: "jsonText too large" };
+  const bytes = Buffer.byteLength(trimmed, "utf8");
+  if (bytes > MAX_JSON_BYTES) {
+    return { ok: false, error: `jsonText too large (${formatBytes(bytes)} > ${formatBytes(MAX_JSON_BYTES)})` };
+  }
 
   try {
     JSON.parse(trimmed);

@@ -6,6 +6,8 @@ import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { DesignerElement, CustomElement } from "../../core/types";
 import { useDesignerHost } from "../hooks/useDesignerHost";
 
+import { Button, ButtonGroup, Checkbox, FormControlLabel, TextField } from "@mui/material";
+
 import { ColorInput, numberInput, Row, textInput } from "./properties/controls";
 
 /* =========================
@@ -34,8 +36,6 @@ export function PropertiesPanel({
 
   return (
     <div>
-      <div className="font-semibold mb-2">Properties</div>
-
       {/* Canvas */}
       <div className="rounded border border-black/15 p-3 space-y-3">
         <div className="font-medium">Canvas</div>
@@ -73,14 +73,10 @@ export function PropertiesPanel({
             id="canvas-grid"
             label="Grid"
             control={
-              <input
-                title="titleCanvas"
+              <Checkbox
                 id="canvas-grid"
-                type="checkbox"
                 checked={state.doc.canvas.gridEnabled}
-                onChange={(e) =>
-                  engine.setCanvas({ gridEnabled: e.target.checked })
-                }
+                onChange={(e) => engine.setCanvas({ gridEnabled: e.target.checked })}
               />
             }
           />
@@ -89,14 +85,10 @@ export function PropertiesPanel({
             id="canvas-snap"
             label="Snap to Grid"
             control={
-              <input
-                title="titleSnap"
+              <Checkbox
                 id="canvas-snap"
-                type="checkbox"
                 checked={state.doc.canvas.snapToGrid}
-                onChange={(e) =>
-                  engine.setCanvas({ snapToGrid: e.target.checked })
-                }
+                onChange={(e) => engine.setCanvas({ snapToGrid: e.target.checked })}
               />
             }
           />
@@ -168,39 +160,41 @@ function ElementProperties({
         label="ID"
         control={
           <div className="flex items-center gap-2">
-            <input
-              id={`${baseId}-id`}
-              className="px-2 py-1 rounded border border-black/15 w-full"
-              type="text"
-              readOnly
-              value={el.id}
-            />
-            <button
-              className="px-2 py-1 rounded border border-black/15"
-              onClick={() => navigator.clipboard?.writeText(el.id)}
-              aria-label="Copy element id"
-            >
+            <TextField id={`${baseId}-id`} fullWidth value={el.id} slotProps={{ input: { readOnly: true } }} />
+            <Button onClick={() => navigator.clipboard?.writeText(el.id)} aria-label="Copy element id">
               Copy
-            </button>
+            </Button>
           </div>
         }
       />
       
         <div className="font-medium mt-2">Transform</div>
-        <div className="flex items-center gap-2 mt-2">
-          <button className="px-2 py-1 rounded border" onClick={() => engine.updateElement(el.id, { rotation: (el.rotation + 45) % 360 })}>Rotate +45</button>
-          <button className="px-2 py-1 rounded border" onClick={() => engine.updateElement(el.id, { rotation: (el.rotation + 315) % 360 })}>Rotate -45</button>
-          <button className="px-2 py-1 rounded border" onClick={() => engine.updateElement(el.id, { rotation: (el.rotation + 90) % 360 })}>Rotate +90</button>
-          <button className="px-2 py-1 rounded border" onClick={() => engine.updateElement(el.id, { rotation: (el.rotation + 270) % 360 })}>Rotate -90</button>
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <ButtonGroup>
+            <Button onClick={() => engine.updateElement(el.id, { rotation: (el.rotation + 45) % 360 })}>Rotate +45</Button>
+            <Button onClick={() => engine.updateElement(el.id, { rotation: (el.rotation + 315) % 360 })}>Rotate -45</Button>
+            <Button onClick={() => engine.updateElement(el.id, { rotation: (el.rotation + 90) % 360 })}>Rotate +90</Button>
+            <Button onClick={() => engine.updateElement(el.id, { rotation: (el.rotation + 270) % 360 })}>Rotate -90</Button>
+          </ButtonGroup>
         </div>
-        <div className="flex items-center gap-2 mt-2">
-          <button className="px-2 py-1 rounded border" onClick={() => engine.updateElement(el.id, { flipV: !el.flipV })}>Flip Vertical</button>
-          <button className="px-2 py-1 rounded border" onClick={() => engine.updateElement(el.id, { flipH: !el.flipH })}>Flip Horizontal</button>
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          <ButtonGroup>
+            <Button onClick={() => engine.updateElement(el.id, { flipV: !el.flipV })}>Flip Vertical</Button>
+            <Button onClick={() => engine.updateElement(el.id, { flipH: !el.flipH })}>Flip Horizontal</Button>
+          </ButtonGroup>
         </div>
         <div className="flex items-center gap-2 mt-2">
           <label className="text-sm text-black/70">Z-index</label>
-          <input title="Z-index" type="number" className="px-2 py-1 rounded border border-black/15 w-24" value={el.zIndex} onChange={(e) => engine.updateElement(el.id, { zIndex: Number(e.target.value) })} />
-          <button className="px-2 py-1 rounded border ml-2" onClick={() => engine.updateElement(el.id, { locked: !el.locked })}>{el.locked ? 'Unlock' : 'Lock'}</button>
+          <TextField
+            title="Z-index"
+            type="number"
+            className="w-24"
+            value={el.zIndex}
+            onChange={(e) => engine.updateElement(el.id, { zIndex: Number(e.target.value) })}
+          />
+          <Button className="ml-2" onClick={() => engine.updateElement(el.id, { locked: !el.locked })}>
+            {el.locked ? "Unlock" : "Lock"}
+          </Button>
         </div>
       </div>
       
@@ -259,32 +253,37 @@ function ElementProperties({
 
       <div className="col-span-2">
         <div className="font-medium mt-2">Event Listeners</div>
-        <div className="flex items-center gap-2 mt-2">
-          <input
-            id={`${baseId}-hover-listener`}
-            type="checkbox"
-            checked={el.enableOnMouseHoverEventListener ?? false}
-            onChange={(e) => engine.updateElement(el.id, { enableOnMouseHoverEventListener: e.target.checked })}
+        <div className="flex flex-col gap-1 mt-2">
+          <FormControlLabel
+            control={
+              <Checkbox
+                id={`${baseId}-hover-listener`}
+                checked={el.enableOnMouseHoverEventListener ?? false}
+                onChange={(e) => engine.updateElement(el.id, { enableOnMouseHoverEventListener: e.target.checked })}
+              />
+            }
+            label="Enable Hover Listener"
           />
-          <label htmlFor={`${baseId}-hover-listener`} className="text-sm">Enable Hover Listener</label>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <input
-            id={`${baseId}-click-listener`}
-            type="checkbox"
-            checked={el.enableOnMouseClickEventListener ?? false}
-            onChange={(e) => engine.updateElement(el.id, { enableOnMouseClickEventListener: e.target.checked })}
+          <FormControlLabel
+            control={
+              <Checkbox
+                id={`${baseId}-click-listener`}
+                checked={el.enableOnMouseClickEventListener ?? false}
+                onChange={(e) => engine.updateElement(el.id, { enableOnMouseClickEventListener: e.target.checked })}
+              />
+            }
+            label="Enable Click Listener"
           />
-          <label htmlFor={`${baseId}-click-listener`} className="text-sm">Enable Click Listener</label>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <input
-            id={`${baseId}-leave-listener`}
-            type="checkbox"
-            checked={el.enableOnMouseLeaveEventListener ?? false}
-            onChange={(e) => engine.updateElement(el.id, { enableOnMouseLeaveEventListener: e.target.checked })}
+          <FormControlLabel
+            control={
+              <Checkbox
+                id={`${baseId}-leave-listener`}
+                checked={el.enableOnMouseLeaveEventListener ?? false}
+                onChange={(e) => engine.updateElement(el.id, { enableOnMouseLeaveEventListener: e.target.checked })}
+              />
+            }
+            label="Enable Leave Listener"
           />
-          <label htmlFor={`${baseId}-leave-listener`} className="text-sm">Enable Leave Listener</label>
         </div>
       </div>
 

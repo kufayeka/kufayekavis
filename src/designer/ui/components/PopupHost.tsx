@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { OpenPopupState, PopupDefinition } from "../../core/registry";
 import { useDesignerHost } from "../hooks/useDesignerHost";
+import { Button } from "@mui/material";
 
 export function PopupHost({ engine, state }: { engine: DesignerEngine; state: DesignerState }) {
   const host = useDesignerHost();
@@ -32,12 +33,7 @@ export function PopupHost({ engine, state }: { engine: DesignerEngine; state: De
       <div className="absolute top-4 right-4 w-[min(420px,90vw)] pointer-events-auto rounded border border-black/15 bg-white shadow-sm overflow-hidden">
         <div className="px-3 py-2 border-b border-black/10 flex items-center justify-between">
           <div className="font-medium text-sm">{def.title}</div>
-          <button
-            className="px-2 py-1 rounded border border-black/15 hover:bg-black/5 text-sm"
-            onClick={() => host.registry.closePopup()}
-          >
-            Close
-          </button>
+          <Button onClick={() => host.registry.closePopup()}>Close</Button>
         </div>
         <div className="p-3">{def.render(ctx) as React.ReactNode}</div>
       </div>

@@ -72,6 +72,8 @@ export type ImageElement = BaseElement & {
   width: number;
   height: number;
   href: string; // data url or url
+  // Optional: store the original href when applying destructive edits (e.g. background removal)
+  originalHref?: string;
   preserveAspectRatio: string;
   // fit mode controls how the image is rendered within the element box.
   // 'none' means raw pixel sizing, 'contain' will letterbox inside the box,
@@ -80,6 +82,24 @@ export type ImageElement = BaseElement & {
   // natural dimensions from the source image when available
   naturalWidth?: number;
   naturalHeight?: number;
+
+  // Simple, non-destructive display filters (applied at render time)
+  imageFilters?: {
+    // 0..3, default 1
+    brightness?: number;
+    // 0..3, default 1
+    contrast?: number;
+    // 0..3, default 1
+    saturate?: number;
+    // 0..1, default 0
+    grayscale?: number;
+    // pixels, default 0
+    blur?: number;
+  };
+
+  // Simple background removal (chroma-key) settings for re-apply.
+  bgRemoveColor?: string;
+  bgRemoveTolerance?: number;
 };
 
 export type TextElement = BaseElement & {

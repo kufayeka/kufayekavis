@@ -191,23 +191,23 @@ export function DesignerApp() {
         </div>
 
         {/* Overlays: these do NOT affect canvas layout/size */}
-        <div className="absolute top-0 left-0 right-0 h-16 border-b border-black/10 bg-[var(--background)] z-30">
+        <div className="absolute top-0 left-0 right-0 h-16 border-b border-black/10 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] backdrop-blur-sm z-30">
           <Ribbon engine={engine} state={state} />
         </div>
 
         {uiLayout.leftPanelVisible && (
-          <div className="absolute left-0 top-16 bottom-10 z-20 bg-[var(--background)]">
+          <div className="absolute left-0 top-16 bottom-10 z-20 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] backdrop-blur-sm">
             <LeftPanel engine={engine} state={state} setTool={setTool} />
           </div>
         )}
 
         {uiLayout.rightPanelVisible && (
-          <div className="absolute right-0 top-16 bottom-10 z-20 bg-[var(--background)]">
+          <div className="absolute right-0 top-16 bottom-10 z-20 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] backdrop-blur-sm">
             <RightPanel engine={engine} state={state} />
           </div>
         )}
 
-        <div className="absolute left-0 right-0 bottom-0 h-10 border-t border-black/10 bg-[var(--background)] z-30">
+        <div className="absolute left-0 right-0 bottom-0 h-10 border-t border-black/10 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] backdrop-blur-sm z-30">
           <BottomBar engine={engine} state={state} />
         </div>
 

@@ -5,6 +5,7 @@ import type React from "react";
 import type { CustomElement } from "../../designer/core/types";
 import type { PropertiesSectionRenderCtx } from "../../designer/ui/components/properties/types";
 import { NUMERIC_DISPLAY_ACTION_IDS } from "./numericDisplay.actions";
+import { Button, ButtonGroup } from "@mui/material";
 
 export function renderNumericDisplayProperties(ctxUnknown: unknown): React.ReactNode {
   const { api, state } = ctxUnknown as PropertiesSectionRenderCtx;
@@ -25,18 +26,12 @@ export function renderNumericDisplayProperties(ctxUnknown: unknown): React.React
       <div className="text-xs text-black/60">label: {label || "(empty)"}</div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <button className="px-2 py-1 rounded border border-black/15 hover:bg-black/5" onClick={() => api.callElementAction(c.id, NUMERIC_DISPLAY_ACTION_IDS.setValueToDefault)}>
-          Reset (action)
-        </button>
-        <button className="px-2 py-1 rounded border border-black/15 hover:bg-black/5" onClick={() => api.updateCustomProps(c.id, { label: "RPM" })}>
-          Set label=RPM
-        </button>
-        <button className="px-2 py-1 rounded border border-black/15 hover:bg-black/5" onClick={() => api.callElementAction(c.id, NUMERIC_DISPLAY_ACTION_IDS.setBoxColor, "#111827")}>
-          Box #111827
-        </button>
-        <button className="px-2 py-1 rounded border border-black/15 hover:bg-black/5" onClick={() => api.updateCustomProps(c.id, { valueColor: "#22c55e" })}>
-          Value green
-        </button>
+        <ButtonGroup>
+          <Button onClick={() => api.callElementAction(c.id, NUMERIC_DISPLAY_ACTION_IDS.setValueToDefault)}>Reset (action)</Button>
+          <Button onClick={() => api.updateCustomProps(c.id, { label: "RPM" })}>Set label=RPM</Button>
+          <Button onClick={() => api.callElementAction(c.id, NUMERIC_DISPLAY_ACTION_IDS.setBoxColor, "#111827")}>Box #111827</Button>
+          <Button onClick={() => api.updateCustomProps(c.id, { valueColor: "#22c55e" })}>Value green</Button>
+        </ButtonGroup>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type React from "react";
 import { HexColorPicker } from "react-colorful";
 import clsx from "clsx";
+import { Button, IconButton, Popover, TextField, Typography } from "@mui/material";
 
 // Helper function to normalize URLs
 export function normalizeUrl(url: string): string {
@@ -32,9 +33,9 @@ export function normalizeUrl(url: string): string {
 
 export function numberInput(id: string, value: number, onChange: (v: number) => void) {
   return (
-    <input
+    <TextField
       id={id}
-      className="px-2 py-1 rounded border border-black/15 w-full"
+      fullWidth
       type="number"
       value={Number.isFinite(value) ? value : 0}
       onChange={(e) => onChange(Number(e.target.value))}
@@ -44,24 +45,19 @@ export function numberInput(id: string, value: number, onChange: (v: number) => 
 
 export function textInput(id: string, value: string, onChange: (v: string) => void) {
   return (
-    <input
-      id={id}
-      className="px-2 py-1 rounded border border-black/15 w-full"
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
+    <TextField id={id} fullWidth value={value} onChange={(e) => onChange(e.target.value)} />
   );
 }
 
 export function textAreaInput(id: string, value: string, onChange: (v: string) => void) {
   return (
-    <textarea
+    <TextField
       id={id}
-      className="px-2 py-1 rounded border border-black/15 w-full min-h-[80px] resize-y"
+      fullWidth
+      multiline
+      minRows={3}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      rows={3}
     />
   );
 }
@@ -91,49 +87,43 @@ export function ColorInput({
   value: string;
   onChange: (v: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   const normalized = normalizeHex(value);
   const swatchColor = isHexColor(value) ? normalized : "transparent";
 
+  const open = Boolean(anchorEl);
+  const onClose = () => setAnchorEl(null);
+
   return (
-    <div className="relative">
-      <div className="flex items-center gap-2">
-        {textInput(id, value, onChange)}
-        <button
-          type="button"
-          className={clsx("h-8 w-8 rounded border border-black flex items-center justify-center cursor-pointer")}
-          aria-label="Open color picker"
-          onClick={() => setOpen((v) => !v)}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <rect x="4" y="4" width="16" height="16" rx="3" fill={swatchColor} stroke="currentColor" opacity="0.9" />
-          </svg>
-        </button>
-      </div>
+    <div className="flex items-center gap-2">
+      {textInput(id, value, onChange)}
+      <IconButton
+        aria-label="Open color picker"
+        onClick={(e) => setAnchorEl(e.currentTarget)}
+        size="small"
+        className={clsx("border border-black/15")}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="3" fill={swatchColor} stroke="currentColor" opacity="0.9" />
+        </svg>
+      </IconButton>
 
-      {open && (
-        <div className="absolute right-0 mt-2 rounded border border-black/15 bg-white">
-          <div className="flex items-center justify-between mt-2">
-            <button
-              type="button"
-              className="px-2 py-1 rounded border border-black/15 hover:bg-black/5 text-sm"
-              onClick={() => onChange("transparent")}
-            >
-              Transparent
-            </button>
-            <button
-              type="button"
-              className="px-2 py-1 rounded border border-black/15 hover:bg-black/5 text-sm"
-              onClick={() => setOpen(false)}
-            >
-              Close
-            </button>
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={onClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <div className="p-2">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <Button variant="outlined" onClick={() => onChange("transparent")}>Transparent</Button>
+            <Button variant="outlined" onClick={onClose}>Close</Button>
           </div>
-
           <HexColorPicker color={normalized} onChange={(c) => onChange(c)} />
         </div>
-      )}
+      </Popover>
     </div>
   );
 }
@@ -153,9 +143,9 @@ export function Row({
 }) {
   return (
     <>
-      <label htmlFor={id} className="text-sm text-black/70">
+      <Typography component="label" htmlFor={id} variant="caption" className="text-black/70">
         {label}
-      </label>
+      </Typography>
       {control}
     </>
   );

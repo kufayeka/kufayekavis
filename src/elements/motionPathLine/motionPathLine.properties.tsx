@@ -7,6 +7,7 @@ import type { PropertiesSectionRenderCtx } from "../../designer/ui/components/pr
 import { ColorInput, Row, numberInput } from "../../designer/ui/components/properties/controls";
 import { MOTION_PATH_LINE_ACTION_IDS } from "./motionPathLine.actions";
 import { MOTION_PATH_LINE_KIND, coerceMotionPathLineProps } from "./motionPathLine.model";
+import { Checkbox, FormControlLabel, MenuItem, TextField } from "@mui/material";
 
 export function renderMotionPathLineProperties(ctxUnknown: unknown): React.ReactNode {
   const { api, engine, state } = ctxUnknown as PropertiesSectionRenderCtx;
@@ -34,17 +35,16 @@ export function renderMotionPathLineProperties(ctxUnknown: unknown): React.React
           id={`${baseId}-animate`}
           label="Animate"
           control={
-            <div className="flex items-center gap-2">
-              <input
-                id={animateId}
-                type="checkbox"
-                checked={Boolean(p.animate)}
-                onChange={(e) => api.callElementAction(c.id, MOTION_PATH_LINE_ACTION_IDS.setAnimate, e.target.checked)}
-              />
-              <label htmlFor={animateId} className="text-sm">
-                Enabled
-              </label>
-            </div>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  id={animateId}
+                  checked={Boolean(p.animate)}
+                  onChange={(e) => api.callElementAction(c.id, MOTION_PATH_LINE_ACTION_IDS.setAnimate, e.target.checked)}
+                />
+              }
+              label="Enabled"
+            />
           }
         />
 
@@ -54,15 +54,16 @@ export function renderMotionPathLineProperties(ctxUnknown: unknown): React.React
           id={`${baseId}-placement`}
           label="Particles"
           control={
-            <select
+            <TextField
               id={`${baseId}-placement`}
-              className="px-2 py-1 rounded border border-black/15 w-full"
+              select
+              fullWidth
               value={p.particlePlacement}
-              onChange={(e) => setProps({ particlePlacement: e.target.value })}
+              onChange={(e) => setProps({ particlePlacement: String(e.target.value) })}
             >
-              <option value="single">Single</option>
-              <option value="along">Along Path</option>
-            </select>
+              <MenuItem value="single">Single</MenuItem>
+              <MenuItem value="along">Along Path</MenuItem>
+            </TextField>
           }
         />
 
@@ -76,15 +77,16 @@ export function renderMotionPathLineProperties(ctxUnknown: unknown): React.React
           id={`${baseId}-direction`}
           label="Direction"
           control={
-            <select
+            <TextField
               id={`${baseId}-direction`}
-              className="px-2 py-1 rounded border border-black/15 w-full"
+              select
+              fullWidth
               value={p.particleDirection}
-              onChange={(e) => setProps({ particleDirection: e.target.value })}
+              onChange={(e) => setProps({ particleDirection: String(e.target.value) })}
             >
-              <option value="forward">Forward</option>
-              <option value="reverse">Reverse</option>
-            </select>
+              <MenuItem value="forward">Forward</MenuItem>
+              <MenuItem value="reverse">Reverse</MenuItem>
+            </TextField>
           }
         />
 
@@ -92,15 +94,16 @@ export function renderMotionPathLineProperties(ctxUnknown: unknown): React.React
           id={`${baseId}-shape`}
           label="Shape"
           control={
-            <select
+            <TextField
               id={`${baseId}-shape`}
-              className="px-2 py-1 rounded border border-black/15 w-full"
+              select
+              fullWidth
               value={p.particleShape}
-              onChange={(e) => setProps({ particleShape: e.target.value })}
+              onChange={(e) => setProps({ particleShape: String(e.target.value) })}
             >
-              <option value="circle">Circle</option>
-              <option value="rect">Rectangle</option>
-            </select>
+              <MenuItem value="circle">Circle</MenuItem>
+              <MenuItem value="rect">Rectangle</MenuItem>
+            </TextField>
           }
         />
 
