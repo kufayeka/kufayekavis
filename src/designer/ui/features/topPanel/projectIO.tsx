@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { Button } from "@mui/material";
 import type { DesignerEngine, DesignerState } from "../../../core/engine";
 import type { DesignerHost } from "../../../core/host";
 import { exportProjectToSvgString } from "../../components/ribbon/exportSvg";
@@ -11,12 +12,9 @@ function ImportJsonButton({ engine }: { engine: DesignerEngine }) {
 
   return (
     <>
-      <button
-        className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
-        onClick={() => inputRef.current?.click()}
-      >
+      <Button onClick={() => inputRef.current?.click()}>
         Import JSON
-      </button>
+      </Button>
       <input
         title="importProject"
         ref={inputRef}
@@ -84,6 +82,53 @@ export function registerTopPanelProjectIO(opts: { host: DesignerHost; engine: De
           document: host.engine.getState().doc,
         });
         downloadSvg("project.svg", svg);
+      },
+    }),
+  );
+
+  disposers.push(
+    host.registry.registerTopRibbonItem({
+      kind: "button",
+      id: "builtin.project.publishOnline",
+      placement: "left",
+      order: 40,
+      label: "Publish Online",
+      onClick: () => {
+        void (async () => {
+          try {
+            const jsonText = engine.exportProjectJson();
+            const res = await fetch("/api/onlineProjects", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ jsonText }),
+            });
+            const data = (await res.json().catch(() => null)) as unknown;
+            if (!data || typeof data !== "object") throw new Error("Invalid response");
+            const rec = data as Record<string, unknown>;
+            if (!rec.ok) throw new Error(typeof rec.error === "string" ? rec.error : "Publish failed");
+            const viewerUrl = typeof rec.viewerUrl === "string" ? rec.viewerUrl : "";
+            if (!viewerUrl) throw new Error("Missing viewerUrl");
+
+            const absolute = `${window.location.origin}${viewerUrl}`;
+
+            try {
+              await navigator.clipboard.writeText(absolute);
+            } catch {
+              // ignore clipboard errors (e.g. non-secure context)
+            }
+
+            try {
+              window.open(absolute, "_blank", "noopener,noreferrer");
+            } catch {
+              // ignore popup blockers
+            }
+
+            // Always show the URL for manual copy.
+            window.prompt("Online viewer URL (copied if possible):", absolute);
+          } catch (e) {
+            window.alert(e instanceof Error ? e.message : "Failed to publish online");
+          }
+        })();
       },
     }),
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@mui/material";
 import type { DesignerEngine, DesignerState } from "../../../core/engine";
 import type { DesignerHost } from "../../../core/host";
 
@@ -22,12 +23,9 @@ export function registerTopPanelViewModeToggle(opts: { host: DesignerHost }): Ar
       render: (ctxUnknown: unknown) => {
         const { engine, state } = ctxUnknown as RibbonCtx;
         return (
-          <button
-            className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
-            onClick={() => engine.setViewMode(!state.viewMode)}
-          >
+          <Button onClick={() => engine.setViewMode(!state.viewMode)}>
             {state.viewMode ? "Edit Mode" : "View Mode"}
-          </button>
+          </Button>
         );
       },
     }),

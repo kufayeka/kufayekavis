@@ -24,6 +24,10 @@ export function PalettePanel({
     () => host.elements.getPaletteItems(),
   );
 
+  // Free Draw is a tool (not a placeable palette element). If any plugin/registry
+  // ever exposes it as a palette item, hide it to avoid showing it twice.
+  const visibleElementItems = elementItems.filter((it) => it.id !== "free");
+
   return (
     <div>
       <div className="font-semibold mb-2">Palette</div>
@@ -50,7 +54,7 @@ export function PalettePanel({
           </button>
         ))}
 
-        {elementItems.map((it) => (
+        {visibleElementItems.map((it) => (
           <button
             key={it.id}
             className={clsx("px-3 py-2 rounded border text-left", "border-black/15 hover:bg-black/5")}

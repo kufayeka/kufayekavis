@@ -20,10 +20,12 @@ import { MOTION_PATH_LINE_KIND, patchMotionPathLineEndpoint } from "../../../ele
 export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: DesignerState }) {
   const host = useDesignerHost();
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const elRefs = useRef(new Map<ElementId, SVGElement>());
   const dragRef = useRef<DragMode>({ kind: "none" });
   const [dragUi, setDragUi] = useState<DragMode>({ kind: "none" });
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [pendingMagnifier, setPendingMagnifier] = useState<
     | null
     | {
@@ -41,6 +43,12 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
     () => host.registry.getCanvasOverlayItems(),
     () => host.registry.getCanvasOverlayItems(),
   ) as CanvasOverlayItem[];
+
+  const uiLayout = useSyncExternalStore(
+    (listener) => host.registry.subscribe(listener),
+    () => host.registry.getUiLayout(),
+    () => host.registry.getUiLayout(),
+  );
 
   const overlayCtx = useMemo(() => ({ engine, state, api: host.api, host }), [engine, host, state]);
 
@@ -103,6 +111,37 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
   const svgWidth = state.doc.canvas.width * state.zoom.scale;
   const svgHeight = state.doc.canvas.height * state.zoom.scale;
   const viewBox = `0 0 ${state.doc.canvas.width} ${state.doc.canvas.height}`;
+
+  // Visual padding around the canvas in scroll space (matches Tailwind p-4).
+  const contentPaddingPx = 16;
+
+  // Safe-area insets so you can scroll the canvas out from under overlay panels.
+  // These match the overlay sizes in DesignerApp.
+  const overlayInsets = useMemo(() => {
+    const left = uiLayout?.leftPanelVisible ? Math.round(containerSize.width * 0.2) : 0;
+    const right = uiLayout?.rightPanelVisible ? Math.round(containerSize.width * 0.22) : 0;
+    const top = 64;
+    const bottom = 40;
+    const viewportWidth = Math.max(0, containerSize.width - left - right);
+    const viewportHeight = Math.max(0, containerSize.height - top - bottom);
+    return { left, right, top, bottom, viewportWidth, viewportHeight };
+  }, [containerSize.height, containerSize.width, uiLayout?.leftPanelVisible, uiLayout?.rightPanelVisible]);
+
+  // When the canvas is smaller than the viewport, center it without breaking pan/zoom math.
+  const contentLayout = useMemo(() => {
+    const availableX = Math.max(0, overlayInsets.viewportWidth - (svgWidth + contentPaddingPx * 2));
+    const availableY = Math.max(0, overlayInsets.viewportHeight - (svgHeight + contentPaddingPx * 2));
+    const centerPadX = Math.floor(availableX / 2);
+    const centerPadY = Math.floor(availableY / 2);
+
+    const originOffsetX = overlayInsets.left + contentPaddingPx + centerPadX;
+    const originOffsetY = overlayInsets.top + contentPaddingPx + centerPadY;
+
+    const contentWidth = Math.max(containerSize.width, overlayInsets.left + overlayInsets.right + svgWidth + contentPaddingPx * 2);
+    const contentHeight = Math.max(containerSize.height, overlayInsets.top + overlayInsets.bottom + svgHeight + contentPaddingPx * 2);
+
+    return { originOffsetX, originOffsetY, contentWidth, contentHeight };
+  }, [containerSize.height, containerSize.width, contentPaddingPx, overlayInsets.bottom, overlayInsets.left, overlayInsets.right, overlayInsets.top, overlayInsets.viewportHeight, overlayInsets.viewportWidth, svgHeight, svgWidth]);
 
   const clientToCanvas = useCallback(
     (clientX: number, clientY: number) => {
@@ -367,17 +406,19 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
           const svg = svgRef.current;
           if (scroller && svg && box.width > 0 && box.height > 0) {
             const containerRect = scroller.getBoundingClientRect();
+            const visibleW = Math.max(1, scroller.clientWidth - overlayInsets.left - overlayInsets.right);
+            const visibleH = Math.max(1, scroller.clientHeight - overlayInsets.top - overlayInsets.bottom);
             const oldScale = engine.getState().zoom.scale;
             const suggested = Math.min(
-              containerRect.width / Math.max(1, box.width),
-              containerRect.height / Math.max(1, box.height),
+              visibleW / Math.max(1, box.width),
+              visibleH / Math.max(1, box.height),
             );
 
             // compute overlay position (center of selection in client coords)
             const centerX = box.x + box.width / 2;
             const centerY = box.y + box.height / 2;
-            const centerClientX = containerRect.left + centerX * oldScale - scroller.scrollLeft;
-            const centerClientY = containerRect.top + centerY * oldScale - scroller.scrollTop;
+            const centerClientX = containerRect.left + contentLayout.originOffsetX + centerX * oldScale - scroller.scrollLeft;
+            const centerClientY = containerRect.top + contentLayout.originOffsetY + centerY * oldScale - scroller.scrollTop;
 
             // position relative to scroller
             const left = centerClientX - containerRect.left;
@@ -607,8 +648,12 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
         let x = state.doc.canvas.width / 2;
         let y = state.doc.canvas.height / 2;
         if (scroller) {
-          const contentPxX = scroller.scrollLeft + scroller.clientWidth / 2;
-          const contentPxY = scroller.scrollTop + scroller.clientHeight / 2;
+          const visibleW = Math.max(1, scroller.clientWidth - overlayInsets.left - overlayInsets.right);
+          const visibleH = Math.max(1, scroller.clientHeight - overlayInsets.top - overlayInsets.bottom);
+          const centerPxX = scroller.scrollLeft + overlayInsets.left + visibleW / 2;
+          const centerPxY = scroller.scrollTop + overlayInsets.top + visibleH / 2;
+          const contentPxX = clamp(centerPxX - contentLayout.originOffsetX, 0, state.doc.canvas.width * state.zoom.scale);
+          const contentPxY = clamp(centerPxY - contentLayout.originOffsetY, 0, state.doc.canvas.height * state.zoom.scale);
           x = contentPxX / state.zoom.scale;
           y = contentPxY / state.zoom.scale;
         }
@@ -662,21 +707,49 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
 
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [engine, state.doc.canvas.width, state.doc.canvas.height, state.zoom.scale]);
+  }, [contentLayout.originOffsetX, contentLayout.originOffsetY, engine, overlayInsets.bottom, overlayInsets.left, overlayInsets.right, overlayInsets.top, state.doc.canvas.height, state.doc.canvas.width, state.zoom.scale]);
+
+  // Keep container size for centering calculations.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+
+    const update = () => {
+      setContainerSize({ width: scroller.clientWidth, height: scroller.clientHeight });
+    };
+
+    update();
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(scroller);
+    return () => ro.disconnect();
+  }, []);
+
+  // Apply dynamic layout without JSX inline styles (repo lint rule).
+  useEffect(() => {
+    const content = contentRef.current;
+    const svg = svgRef.current;
+    if (!content || !svg) return;
+
+    content.style.width = `${contentLayout.contentWidth}px`;
+    content.style.height = `${contentLayout.contentHeight}px`;
+    svg.style.left = `${contentLayout.originOffsetX}px`;
+    svg.style.top = `${contentLayout.originOffsetY}px`;
+  }, [contentLayout.contentHeight, contentLayout.contentWidth, contentLayout.originOffsetX, contentLayout.originOffsetY]);
 
   // Keep scroll position in sync with engine zoom.panX/panY when zoom state changes.
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
     // Convert pan (canvas units) to content pixels
-    const left = Math.max(0, Math.round((state.zoom.panX ?? 0) * state.zoom.scale));
-    const top = Math.max(0, Math.round((state.zoom.panY ?? 0) * state.zoom.scale));
+    const left = Math.max(0, Math.round(contentLayout.originOffsetX + (state.zoom.panX ?? 0) * state.zoom.scale));
+    const top = Math.max(0, Math.round(contentLayout.originOffsetY + (state.zoom.panY ?? 0) * state.zoom.scale));
     // Apply without triggering layout thrash in tight loops
     requestAnimationFrame(() => {
       scroller.scrollLeft = left;
       scroller.scrollTop = top;
     });
-  }, [state.zoom.scale, state.zoom.panX, state.zoom.panY]);
+  }, [contentLayout.originOffsetX, contentLayout.originOffsetY, state.zoom.scale, state.zoom.panX, state.zoom.panY]);
 
   const onWheel = (e: React.WheelEvent) => {
     // Zoom when Ctrl+scroll OR when magnifier tool is active
@@ -693,12 +766,16 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
 
     if (scroller) {
       const containerRect = scroller.getBoundingClientRect();
+      const visibleW = Math.max(1, scroller.clientWidth - overlayInsets.left - overlayInsets.right);
+      const visibleH = Math.max(1, scroller.clientHeight - overlayInsets.top - overlayInsets.bottom);
       const pointerX = e.clientX - containerRect.left;
       const pointerY = e.clientY - containerRect.top;
 
       // canvas coordinates under cursor before scaling (in canvas units)
-      const contentPxX = scroller.scrollLeft + pointerX;
-      const contentPxY = scroller.scrollTop + pointerY;
+      const maxContentPxX = state.doc.canvas.width * oldScale;
+      const maxContentPxY = state.doc.canvas.height * oldScale;
+      const contentPxX = clamp(scroller.scrollLeft + pointerX - contentLayout.originOffsetX, 0, maxContentPxX);
+      const contentPxY = clamp(scroller.scrollTop + pointerY - contentLayout.originOffsetY, 0, maxContentPxY);
       const canvasX = contentPxX / oldScale;
       const canvasY = contentPxY / oldScale;
 
@@ -707,8 +784,8 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       const newPanY = canvasY - pointerY / nextScale;
 
       // Clamp pan to canvas bounds (in canvas units)
-      const maxPanX = Math.max(0, state.doc.canvas.width - containerRect.width / nextScale);
-      const maxPanY = Math.max(0, state.doc.canvas.height - containerRect.height / nextScale);
+      const maxPanX = Math.max(0, state.doc.canvas.width - visibleW / nextScale);
+      const maxPanY = Math.max(0, state.doc.canvas.height - visibleH / nextScale);
 
       engine.setZoom({ scale: nextScale, panX: clamp(newPanX, 0, maxPanX), panY: clamp(newPanY, 0, maxPanY) });
       return;
@@ -725,14 +802,14 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
   }, []);
 
   return (
-    <div ref={scrollRef} className="h-full w-full relative">
-      <div className="min-h-full min-w-full flex items-start justify-start p-4">
+    <div ref={scrollRef} className="h-full w-full relative overflow-auto overscroll-contain">
+      <div ref={contentRef} className="relative min-w-full min-h-full">
         <svg
           ref={svgRef}
           width={svgWidth}
           height={svgHeight}
           viewBox={viewBox}
-          className="border border-black/20 bg-transparent"
+          className="border border-black/20 bg-transparent absolute"
           onPointerDown={onCanvasPointerDown}
           onClick={(e) => {
             const target = e.target as Element | null;
@@ -846,15 +923,17 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
               const scroller = scrollRef.current;
               if (!scroller) return setPendingMagnifier(null);
               const containerRect = scroller.getBoundingClientRect();
+              const visibleW = Math.max(1, scroller.clientWidth - overlayInsets.left - overlayInsets.right);
+              const visibleH = Math.max(1, scroller.clientHeight - overlayInsets.top - overlayInsets.bottom);
               const newScale = Math.max(0.1, Math.min(8, percent / 100));
 
               // Center selection in viewport by computing pan in canvas units
               const centerX = pendingMagnifier.box.x + pendingMagnifier.box.width / 2;
               const centerY = pendingMagnifier.box.y + pendingMagnifier.box.height / 2;
-              const newPanX = centerX - containerRect.width / (2 * newScale);
-              const newPanY = centerY - containerRect.height / (2 * newScale);
-              const maxPanX = Math.max(0, state.doc.canvas.width - containerRect.width / newScale);
-              const maxPanY = Math.max(0, state.doc.canvas.height - containerRect.height / newScale);
+              const newPanX = centerX - visibleW / (2 * newScale);
+              const newPanY = centerY - visibleH / (2 * newScale);
+              const maxPanX = Math.max(0, state.doc.canvas.width - visibleW / newScale);
+              const maxPanY = Math.max(0, state.doc.canvas.height - visibleH / newScale);
 
               engine.setZoom({ scale: newScale, panX: clamp(newPanX, 0, maxPanX), panY: clamp(newPanY, 0, maxPanY) });
               setPendingMagnifier(null);

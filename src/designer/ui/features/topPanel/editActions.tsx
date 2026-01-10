@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@mui/material";
 import type { DesignerEngine, DesignerState } from "../../../core/engine";
 import type { DesignerHost } from "../../../core/host";
 
@@ -25,13 +26,9 @@ function simpleAction(
     render: (ctxUnknown: unknown) => {
       const ctx = ctxUnknown as RibbonCtx;
       return (
-        <button
-          className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
-          onClick={() => onClick(ctx)}
-          disabled={disabled ? disabled(ctx) : false}
-        >
+        <Button onClick={() => onClick(ctx)} disabled={disabled ? disabled(ctx) : false}>
           {label}
-        </button>
+        </Button>
       );
     },
   });
@@ -56,13 +53,9 @@ export function registerTopPanelEditActions(opts: { host: DesignerHost }): Array
       render: () => {
         const layout = host.registry.getUiLayout();
         return (
-          <button
-            className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
-            onClick={() => host.registry.toggleFocusCanvas()}
-            title="Focus canvas (hide both panels)"
-          >
+          <Button onClick={() => host.registry.toggleFocusCanvas()} title="Focus canvas (hide both panels)">
             {layout.focusCanvas ? "Exit Focus" : "Focus Canvas"}
-          </button>
+          </Button>
         );
       },
     }),
@@ -77,13 +70,9 @@ export function registerTopPanelEditActions(opts: { host: DesignerHost }): Array
       render: () => {
         const layout = host.registry.getUiLayout();
         return (
-          <button
-            className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
-            onClick={() => host.registry.toggleLeftPanel()}
-            title="Toggle Left Panel"
-          >
+          <Button onClick={() => host.registry.toggleLeftPanel()} title="Toggle Left Panel">
             {layout.leftPanelVisible ? "Hide Left" : "Show Left"}
-          </button>
+          </Button>
         );
       },
     }),
@@ -98,13 +87,9 @@ export function registerTopPanelEditActions(opts: { host: DesignerHost }): Array
       render: () => {
         const layout = host.registry.getUiLayout();
         return (
-          <button
-            className="px-3 py-1.5 rounded border border-black/15 hover:bg-black/5"
-            onClick={() => host.registry.toggleRightPanel()}
-            title="Toggle Right Panel"
-          >
+          <Button onClick={() => host.registry.toggleRightPanel()} title="Toggle Right Panel">
             {layout.rightPanelVisible ? "Hide Right" : "Show Right"}
-          </button>
+          </Button>
         );
       },
     }),

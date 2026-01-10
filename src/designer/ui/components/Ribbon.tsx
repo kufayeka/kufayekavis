@@ -3,7 +3,7 @@
 import type React from "react";
 import { useMemo, useState } from "react";
 import { useSyncExternalStore } from "react";
-import clsx from "clsx";
+import { Button, TextField } from "@mui/material";
 import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { RibbonAction, TopRibbonItem } from "../../core/registry";
 import { useDesignerHost } from "../hooks/useDesignerHost";
@@ -66,20 +66,17 @@ export function Ribbon({ engine, state }: { engine: DesignerEngine; state: Desig
     return [...base, ...legacy];
   }, [legacyRibbonActions, visibleTopItems]);
 
-  const buttonClass = clsx("px-3 py-1.5 rounded border border-black/15 hover:bg-black/5");
-
   const renderItem = (it: TopRibbonItem): React.ReactNode => {
     if (it.kind === "button") {
       return (
-        <button
+        <Button
           key={it.id}
-          className={buttonClass}
           onClick={it.onClick}
           disabled={it.disabled}
           title={it.label}
         >
           {it.label}
-        </button>
+        </Button>
       );
     }
     return <span key={it.id}>{it.render(ctx) as React.ReactNode}</span>;
@@ -92,19 +89,12 @@ export function Ribbon({ engine, state }: { engine: DesignerEngine; state: Desig
           <div className="flex flex-nowrap items-center gap-2">{left.map(renderItem)}</div>
           <div className="flex flex-nowrap items-center gap-2">{right.map(renderItem)}</div>
           <div className="flex flex-nowrap items-center gap-2">
-            <button
-              className={buttonClass}
-              onClick={() => engine.setZoom({ scale: state.zoom.scale / 1.1 })}
-            >
+            <Button onClick={() => engine.setZoom({ scale: state.zoom.scale / 1.1 })}>
               -
-            </button>
-            <input
-              className="w-[80px] text-center tabular-nums px-2 py-1.5 rounded border border-black/15"
+            </Button>
+            <TextField
               inputMode="numeric"
               type="number"
-              min={10}
-              max={800}
-              step={1}
               value={isZoomEditing ? zoomPercentText : String(derivedZoomPercent)}
               onFocus={() => {
                 setIsZoomEditing(true);
@@ -132,13 +122,19 @@ export function Ribbon({ engine, state }: { engine: DesignerEngine; state: Desig
               }}
               aria-label="Zoom percent"
               title="Zoom (%)"
+              sx={{ width: 90 }}
+              slotProps={{
+                htmlInput: {
+                  min: 10,
+                  max: 800,
+                  step: 1,
+                  style: { textAlign: "center", fontVariantNumeric: "tabular-nums" },
+                },
+              }}
             />
-            <button
-              className={buttonClass}
-              onClick={() => engine.setZoom({ scale: state.zoom.scale * 1.1 })}
-            >
+            <Button onClick={() => engine.setZoom({ scale: state.zoom.scale * 1.1 })}>
               +
-            </button>
+            </Button>
           </div>
         </div>
       </div>

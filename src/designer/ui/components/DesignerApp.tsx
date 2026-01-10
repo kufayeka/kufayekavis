@@ -184,18 +184,33 @@ export function DesignerApp() {
 
   return (
     <DesignerHostProvider host={host}>
-      <div className="h-screen w-screen flex flex-col relative">
-        <div className="h-16 w-full border-b border-black/10">
+      <div className="h-screen w-screen relative overflow-hidden">
+        {/* Base layer: canvas uses the full viewport and can overflow/scroll independently */}
+        <div className="absolute inset-0">
+          <SvgCanvas engine={engine} state={state} />
+        </div>
+
+        {/* Overlays: these do NOT affect canvas layout/size */}
+        <div className="absolute top-0 left-0 right-0 h-16 border-b border-black/10 bg-[var(--background)] z-30">
           <Ribbon engine={engine} state={state} />
         </div>
-        <div className="flex-1 w-full flex min-h-0">
-          {uiLayout.leftPanelVisible && <LeftPanel engine={engine} state={state} setTool={setTool} />}
-          <div className="min-w-0 flex-1">
-            <SvgCanvas engine={engine} state={state} />
+
+        {uiLayout.leftPanelVisible && (
+          <div className="absolute left-0 top-16 bottom-10 z-20 bg-[var(--background)]">
+            <LeftPanel engine={engine} state={state} setTool={setTool} />
           </div>
-          {uiLayout.rightPanelVisible && <RightPanel engine={engine} state={state} />}
+        )}
+
+        {uiLayout.rightPanelVisible && (
+          <div className="absolute right-0 top-16 bottom-10 z-20 bg-[var(--background)]">
+            <RightPanel engine={engine} state={state} />
+          </div>
+        )}
+
+        <div className="absolute left-0 right-0 bottom-0 h-10 border-t border-black/10 bg-[var(--background)] z-30">
+          <BottomBar engine={engine} state={state} />
         </div>
-        <BottomBar engine={engine} state={state} />
+
         <DialogHost engine={engine} state={state} />
         <PopupHost engine={engine} state={state} />
       </div>
