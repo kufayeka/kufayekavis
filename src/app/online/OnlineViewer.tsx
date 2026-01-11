@@ -21,7 +21,7 @@ async function fetchOnlineProjectJsonText(id: string): Promise<string> {
   return rec.jsonText;
 }
 
-export function OnlineViewer({ projectId }: { projectId: string }) {
+export function OnlineViewer({ projectId, canvasId }: { projectId: string; canvasId?: string }) {
   const host = useMemo(() => createDesignerHost(), []);
   const engine = host.engine;
   const { state } = useDesignerEngine(engine);
@@ -49,6 +49,9 @@ export function OnlineViewer({ projectId }: { projectId: string }) {
         const jsonText = await fetchOnlineProjectJsonText(projectId);
         if (!alive) return;
         engine.importProjectJson(jsonText);
+        if (canvasId) {
+          engine.setActiveCanvas(canvasId);
+        }
         engine.setViewMode(true);
         engine.clearSelection();
         setStatus({ kind: "ready" });
@@ -68,7 +71,7 @@ export function OnlineViewer({ projectId }: { projectId: string }) {
         }
       }
     };
-  }, [engine, host, projectId]);
+  }, [canvasId, engine, host, projectId]);
 
   return (
     <DesignerHostProvider host={host}>

@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import crypto from "node:crypto";
+import { createShortId } from "./shortId";
 
 // Keep this reasonably small: online publish is meant for a single project snapshot.
 // Note: some hosting providers enforce their own request size limits.
@@ -30,9 +30,21 @@ export async function ensureOnlineProjectStore(): Promise<void> {
   await fs.mkdir(storeDir(), { recursive: true });
 }
 
-export function createOnlineProjectId(): string {
-  // URL-safe id
-  return crypto.randomUUID();
+export async function createOnlineProjectId(): Promise<string> {
+  // 5-char id, retry on collisions.
+  await ensureOnlineProjectStore();
+  for (let i = 0; i < 64; i++) {
+    const id = createShortId();
+    const fp = filePathForId(id);
+    try {
+      await fs.access(fp);
+      // exists -> retry
+    } catch {
+      return id;
+    }
+  }
+
+  throw new Error("Failed to allocate online project id");
 }
 
 export function validateJsonText(jsonText: string): { ok: true } | { ok: false; error: string } {

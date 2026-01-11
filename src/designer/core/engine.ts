@@ -13,7 +13,7 @@ import {
 } from "./defaults";
 import { clamp } from "./math";
 import { Emitter } from "./emitter";
-import { exportDocument, importDocument } from "./serialize";
+import { createCanvasId, createEmptyProject, exportProjectJsonText, getActiveCanvas, importProjectJsonText } from "./project";
 import { translateElement } from "./transform";
 import { getSelectionBBox } from "./geometry";
 import { canRedo, canUndo, commitDocChange, ensureHistory, redoDoc, undoDoc } from "./history";
@@ -21,8 +21,10 @@ import { normalizeElement } from "./normalize";
 import type {
   CanvasSettings,
   ClipboardPayload,
+  DesignerCanvas,
   DesignerDocument,
   DesignerElement,
+  DesignerProject,
   ElementId,
   SelectionState,
   ToolType,
@@ -30,6 +32,7 @@ import type {
 } from "./types";
 
 export type DesignerState = {
+  project: DesignerProject;
   doc: DesignerDocument;
   selection: SelectionState;
   zoom: ZoomState;
@@ -72,8 +75,18 @@ export class DesignerEngine {
   private pendingHistoryDelayMs = 180;
 
   constructor(initial?: Partial<DesignerState>) {
+    const baseProject = initial?.project ?? createEmptyProject();
+    const active = getActiveCanvas(baseProject);
+    const initialDoc = ensureHistory(initial?.doc ?? active.doc ?? createEmptyDocument());
+    const project: DesignerProject = {
+      ...baseProject,
+      canvases: baseProject.canvases.map((c) => (c.id === active.id ? { ...c, doc: initialDoc } : c)),
+      activeCanvasId: active.id,
+    };
+
     this.state = {
-      doc: ensureHistory(initial?.doc ?? createEmptyDocument()),
+      project,
+      doc: initialDoc,
       selection: initial?.selection ?? { ids: [] },
       zoom: initial?.zoom ?? { scale: 1, panX: 0, panY: 0 },
       tool: initial?.tool ?? "select",
@@ -88,6 +101,27 @@ export class DesignerEngine {
 
   getState(): DesignerState {
     return this.state;
+  }
+
+  getProject(): DesignerProject {
+    return this.state.project;
+  }
+
+  private syncActiveCanvasDoc(project: DesignerProject, nextDoc: DesignerDocument): DesignerProject {
+    const activeId = project.activeCanvasId;
+    return {
+      ...project,
+      canvases: project.canvases.map((c) => (c.id === activeId ? { ...c, doc: nextDoc } : c)),
+    };
+  }
+
+  private setDoc(
+    nextDocRaw: DesignerDocument,
+    patch?: Partial<Pick<DesignerState, "selection" | "zoom" | "tool" | "clipboard" | "viewMode">>,
+  ) {
+    const nextDoc = ensureHistory(nextDocRaw);
+    const nextProject = this.syncActiveCanvasDoc(this.state.project, nextDoc);
+    this.setState({ ...this.state, ...patch, doc: nextDoc, project: nextProject });
   }
 
   private setState(next: DesignerState): void {
@@ -120,7 +154,7 @@ export class DesignerEngine {
 
     const committed = commitDocChange(base, current);
     this.clearPendingHistory();
-    this.setState({ ...this.state, doc: committed });
+    this.setDoc(committed);
   }
 
   private schedulePendingHistoryFlush(): void {
@@ -138,7 +172,7 @@ export class DesignerEngine {
     // Ensure we don't accidentally merge a prior buffered change into this immediate one.
     this.flushPendingHistory();
     const committed = commitDocChange(this.state.doc, ensureHistory(nextDoc));
-    this.setState({ ...this.state, ...patch, doc: committed });
+    this.setDoc(committed, patch);
   }
 
   private commitDocBuffered(
@@ -154,7 +188,7 @@ export class DesignerEngine {
 
     const baseHistory = ensureHistory(this.pendingHistoryBaseDoc).history!;
     const nextWithHistory = { ...ensureHistory(nextDoc), history: baseHistory };
-    this.setState({ ...this.state, ...patch, doc: nextWithHistory });
+    this.setDoc(nextWithHistory, patch);
     this.schedulePendingHistoryFlush();
   }
 
@@ -203,12 +237,117 @@ export class DesignerEngine {
     const cur = (this.state.doc as unknown as { pluginSettings?: Record<string, unknown> }).pluginSettings ?? {};
     const nextSettings = { ...cur, [pluginId]: value };
     // Plugin settings should not affect undo/redo history; update doc directly.
+    this.setDoc({
+      ...this.state.doc,
+      pluginSettings: nextSettings,
+    });
+  }
+
+  setProjectId(id: string): void {
+    this.setState({ ...this.state, project: { ...this.state.project, id } });
+  }
+
+  setActiveCanvas(canvasId: string): void {
+    const p = this.state.project;
+    const target = p.canvases.find((c) => c.id === canvasId);
+    if (!target) return;
+
+    this.flushHistory();
     this.setState({
       ...this.state,
-      doc: {
-        ...this.state.doc,
-        pluginSettings: nextSettings,
-      },
+      project: { ...p, activeCanvasId: target.id },
+      doc: ensureHistory(target.doc),
+      selection: { ids: [] },
+      zoom: { scale: 1, panX: 0, panY: 0 },
+      tool: "select",
+    });
+  }
+
+  addCanvas(): string {
+    this.flushHistory();
+    const newId = createCanvasId();
+    const nextCanvas: DesignerCanvas = {
+      id: newId,
+      name: `Canvas ${this.state.project.canvases.length + 1}`,
+      doc: createEmptyDocument(),
+    };
+    const nextProject: DesignerProject = {
+      ...this.state.project,
+      canvases: [...this.state.project.canvases, nextCanvas],
+      activeCanvasId: newId,
+    };
+
+    this.setState({
+      ...this.state,
+      project: nextProject,
+      doc: ensureHistory(nextCanvas.doc),
+      selection: { ids: [] },
+      zoom: { scale: 1, panX: 0, panY: 0 },
+      tool: "select",
+    });
+
+    return newId;
+  }
+
+  duplicateCanvas(canvasId: string): string {
+    this.flushHistory();
+    const src = this.state.project.canvases.find((c) => c.id === canvasId);
+    if (!src) return "";
+
+    const newId = createCanvasId();
+    const cloned = JSON.parse(JSON.stringify(src.doc)) as DesignerDocument;
+    (cloned as unknown as { history?: unknown }).history = { limit: 10, past: [], future: [] };
+
+    const nextCanvas: DesignerCanvas = {
+      id: newId,
+      name: `${src.name} Copy`,
+      doc: ensureHistory(cloned),
+    };
+
+    const nextProject: DesignerProject = {
+      ...this.state.project,
+      canvases: [...this.state.project.canvases, nextCanvas],
+      activeCanvasId: newId,
+    };
+
+    this.setState({
+      ...this.state,
+      project: nextProject,
+      doc: ensureHistory(nextCanvas.doc),
+      selection: { ids: [] },
+      zoom: { scale: 1, panX: 0, panY: 0 },
+      tool: "select",
+    });
+
+    return newId;
+  }
+
+  renameCanvas(canvasId: string, name: string): void {
+    const trimmed = (name ?? "").trim();
+    if (!trimmed) return;
+    const nextProject: DesignerProject = {
+      ...this.state.project,
+      canvases: this.state.project.canvases.map((c) => (c.id === canvasId ? { ...c, name: trimmed } : c)),
+    };
+    this.setState({ ...this.state, project: nextProject });
+  }
+
+  deleteCanvas(canvasId: string): void {
+    const p = this.state.project;
+    if (p.canvases.length <= 1) return;
+    const nextCanvases = p.canvases.filter((c) => c.id !== canvasId);
+    if (nextCanvases.length === p.canvases.length) return;
+
+    const nextActive = p.activeCanvasId === canvasId ? nextCanvases[0].id : p.activeCanvasId;
+    const nextProject: DesignerProject = { ...p, canvases: nextCanvases, activeCanvasId: nextActive };
+
+    const nextDoc = ensureHistory(nextCanvases.find((c) => c.id === nextActive)?.doc ?? this.state.doc);
+
+    this.setState({
+      ...this.state,
+      project: nextProject,
+      doc: nextDoc,
+      selection: { ids: [] },
     });
   }
 
@@ -683,15 +822,19 @@ export class DesignerEngine {
 
   exportProjectJson(): string {
     this.flushHistory();
-    return exportDocument(this.state.doc);
+    const synced = this.syncActiveCanvasDoc(this.state.project, this.state.doc);
+    return exportProjectJsonText(synced);
   }
 
   importProjectJson(jsonText: string) {
     this.clearPendingHistory();
     this.historyBatchDepth = 0;
-    const doc = ensureHistory(importDocument(jsonText));
+    const project = importProjectJsonText(jsonText);
+    const active = getActiveCanvas(project);
+    const doc = ensureHistory(active.doc);
     this.setState({
       ...this.state,
+      project: this.syncActiveCanvasDoc(project, doc),
       doc,
       selection: { ids: [] },
       zoom: { scale: 1, panX: 0, panY: 0 },
@@ -711,7 +854,7 @@ export class DesignerEngine {
     this.flushHistory();
     const res = undoDoc(this.state.doc);
     if (!res.didUndo) return false;
-    this.setState({ ...this.state, doc: res.doc, selection: { ids: [] } });
+    this.setDoc(res.doc, { selection: { ids: [] } });
     return true;
   }
 
@@ -719,7 +862,7 @@ export class DesignerEngine {
     this.flushHistory();
     const res = redoDoc(this.state.doc);
     if (!res.didRedo) return false;
-    this.setState({ ...this.state, doc: res.doc, selection: { ids: [] } });
+    this.setDoc(res.doc, { selection: { ids: [] } });
     return true;
   }
 }

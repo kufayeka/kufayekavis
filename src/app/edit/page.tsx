@@ -1,7 +1,16 @@
 "use client";
 
-import { DesignerApp } from "../../designer/ui/components/DesignerApp";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createShortId } from "../../lib/shortId";
 
 export default function EditPage() {
-  return <DesignerApp />;
+  const router = useRouter();
+
+  useEffect(() => {
+    const id = createShortId();
+    router.replace(`/edit/${id}`);
+  }, [router]);
+
+  return null;
 }

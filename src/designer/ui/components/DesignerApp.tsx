@@ -16,7 +16,7 @@ import { DesignerHostProvider } from "../hooks/useDesignerHost";
 import { mqttScadaPlugin } from "../../plugins/mqttScadaPlugin";
 import { builtInElementPlugins, builtInUiPlugin } from "../../plugins/builtinPlugins";
 
-export function DesignerApp() {
+export function DesignerApp({ projectId }: { projectId?: string }) {
   const host = useMemo(() => createDesignerHost(), []);
   const engine = host.engine;
   const { state } = useDesignerEngine(engine);
@@ -29,7 +29,7 @@ export function DesignerApp() {
 
   // Autosave/restore project to localStorage for robustness across refresh.
   useEffect(() => {
-    const storageKey = "kufayekavis.designer.project.v1";
+    const storageKey = projectId ? `kufayekavis.designer.project.v1.${projectId}` : "kufayekavis.designer.project.v1";
 
     const safeGet = (): string | null => {
       try {
@@ -55,6 +55,11 @@ export function DesignerApp() {
       } catch {
         // ignore invalid saved state
       }
+    }
+
+    // Ensure engine project id matches the route param.
+    if (projectId) {
+      engine.setProjectId(projectId);
     }
 
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -85,7 +90,7 @@ export function DesignerApp() {
       unsubscribe();
       if (timer) clearTimeout(timer);
     };
-  }, [engine]);
+  }, [engine, projectId]);
 
   // Register built-in custom elements (and demo controls) at app level.
   useEffect(() => {

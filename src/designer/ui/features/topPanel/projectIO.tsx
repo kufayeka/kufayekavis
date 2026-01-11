@@ -11,29 +11,47 @@ function buildPublishJsonText(rawJsonText: string): string {
   try {
     const parsed = JSON.parse(rawJsonText) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return rawJsonText;
-    const doc = parsed as Record<string, unknown>;
+    const root = parsed as Record<string, unknown>;
 
-    // Online publish is for viewing; remove undo history (can be huge).
-    if (doc.history && typeof doc.history === "object" && !Array.isArray(doc.history)) {
-      const hist = doc.history as Record<string, unknown>;
-      hist.past = [];
-      hist.future = [];
-      doc.history = hist;
-    }
+    const stripDoc = (maybeDoc: unknown): unknown => {
+      if (!maybeDoc || typeof maybeDoc !== "object" || Array.isArray(maybeDoc)) return maybeDoc;
+      const doc = { ...(maybeDoc as Record<string, unknown>) };
 
-    // Background removal stores `originalHref` which can duplicate large data URLs.
-    if (doc.elements && typeof doc.elements === "object" && !Array.isArray(doc.elements)) {
-      const els = doc.elements as Record<string, unknown>;
-      for (const key of Object.keys(els)) {
-        const el = els[key];
-        if (!el || typeof el !== "object" || Array.isArray(el)) continue;
-        const rec = el as Record<string, unknown>;
-        if (typeof rec.originalHref === "string") delete rec.originalHref;
+      // Online publish is for viewing; remove undo history (can be huge).
+      if (doc.history && typeof doc.history === "object" && !Array.isArray(doc.history)) {
+        const hist = doc.history as Record<string, unknown>;
+        hist.past = [];
+        hist.future = [];
+        doc.history = hist;
       }
-      doc.elements = els;
+
+      // Background removal stores `originalHref` which can duplicate large data URLs.
+      if (doc.elements && typeof doc.elements === "object" && !Array.isArray(doc.elements)) {
+        const els = { ...(doc.elements as Record<string, unknown>) };
+        for (const key of Object.keys(els)) {
+          const el = els[key];
+          if (!el || typeof el !== "object" || Array.isArray(el)) continue;
+          const rec = el as Record<string, unknown>;
+          if (typeof rec.originalHref === "string") delete rec.originalHref;
+        }
+        doc.elements = els;
+      }
+
+      return doc;
+    };
+
+    if (Array.isArray(root.canvases)) {
+      const canvases = root.canvases
+        .map((c) => {
+          if (!c || typeof c !== "object" || Array.isArray(c)) return c;
+          const rec = { ...(c as Record<string, unknown>) };
+          rec.doc = stripDoc(rec.doc);
+          return rec;
+        });
+      return JSON.stringify({ ...root, canvases });
     }
 
-    return JSON.stringify(doc);
+    return JSON.stringify(stripDoc(root));
   } catch {
     return rawJsonText;
   }
@@ -129,10 +147,11 @@ export function registerTopPanelProjectIO(opts: { host: DesignerHost; engine: De
         void (async () => {
           try {
             const jsonText = buildPublishJsonText(engine.exportProjectJson());
+            const project = engine.getProject();
             const res = await fetch("/api/onlineProjects", {
               method: "POST",
-              headers: { "content-type": "text/plain; charset=utf-8" },
-              body: jsonText,
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ jsonText, projectId: project.id, canvasId: project.activeCanvasId }),
             });
             const data = (await res.json().catch(() => null)) as unknown;
             if (!data || typeof data !== "object") throw new Error("Invalid response");

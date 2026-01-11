@@ -159,6 +159,23 @@ export type DesignerDocumentSnapshot = {
   nextZ: number;
 };
 
+export type CanvasId = string;
+export type ProjectId = string;
+
+export type DesignerCanvas = {
+  id: CanvasId;
+  name: string;
+  doc: DesignerDocument;
+};
+
+export type DesignerProject = {
+  version: 1;
+  id: ProjectId;
+  name?: string;
+  canvases: DesignerCanvas[];
+  activeCanvasId: CanvasId;
+};
+
 export type PluginSettingsMap = Record<string, unknown>;
 
 export type DesignerHistory = {

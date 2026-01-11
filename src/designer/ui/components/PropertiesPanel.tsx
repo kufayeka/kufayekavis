@@ -36,78 +36,8 @@ export function PropertiesPanel({
 
   return (
     <div>
-      {/* Canvas */}
-      <div className="rounded border border-black/15 p-3 space-y-3">
-        <div className="font-medium">Canvas</div>
-
-        <div className="grid grid-cols-2 gap-2 items-center">
-          <Row
-            id="canvas-width"
-            label="Width"
-            control={numberInput("canvas-width", state.doc.canvas.width, (v) =>
-              engine.setCanvas({ width: Math.max(1, v) })
-            )}
-          />
-
-          <Row
-            id="canvas-height"
-            label="Height"
-            control={numberInput("canvas-height", state.doc.canvas.height, (v) =>
-              engine.setCanvas({ height: Math.max(1, v) })
-            )}
-          />
-
-          <Row
-            id="canvas-bg"
-            label="Background"
-            control={
-              <ColorInput
-                id="canvas-bg"
-                value={state.doc.canvas.background}
-                onChange={(v) => engine.setCanvas({ background: v })}
-              />
-            }
-          />
-
-          <Row
-            id="canvas-grid"
-            label="Grid"
-            control={
-              <Checkbox
-                id="canvas-grid"
-                checked={state.doc.canvas.gridEnabled}
-                onChange={(e) => engine.setCanvas({ gridEnabled: e.target.checked })}
-              />
-            }
-          />
-
-          <Row
-            id="canvas-snap"
-            label="Snap to Grid"
-            control={
-              <Checkbox
-                id="canvas-snap"
-                checked={state.doc.canvas.snapToGrid}
-                onChange={(e) => engine.setCanvas({ snapToGrid: e.target.checked })}
-              />
-            }
-          />
-
-          <Row
-            id="canvas-grid-size"
-            label="Grid Size"
-            control={numberInput(
-              "canvas-grid-size",
-              state.doc.canvas.gridSize,
-              (v) =>
-                engine.setCanvas({ gridSize: Math.max(1, v) })
-            )}
-          />
-        </div>
-      </div>
-
       {/* Selection */}
-      <div className="rounded border border-black/15 p-3 space-y-3 mt-4">
+      <div className="rounded border border-black/15 p-3 space-y-3">
         <div className="font-medium">Selection</div>
 
         {state.selection.ids.length === 0 && (
