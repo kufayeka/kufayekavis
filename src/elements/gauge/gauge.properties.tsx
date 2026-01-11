@@ -126,9 +126,9 @@ function GaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React.Re
       </div>
 
       <div className="grid grid-cols-2 gap-2 items-center">
-        <ColorInput id={`${c.id}-backgroundColor`} value={p.backgroundColor} onChange={(v) => api.updateCustomProps(c.id, { backgroundColor: v })} />
-        <ColorInput id={`${c.id}-trackColor`} value={p.trackColor} onChange={(v) => api.updateCustomProps(c.id, { trackColor: v })} />
-        <ColorInput id={`${c.id}-fillColor`} value={p.fillColor} onChange={(v) => api.updateCustomProps(c.id, { fillColor: v })} />
+        <ColorInput label="backgroundColor" id={`${c.id}-backgroundColor`} value={p.backgroundColor} onChange={(v) => api.updateCustomProps(c.id, { backgroundColor: v })} />
+        <ColorInput label="trackColor" id={`${c.id}-trackColor`} value={p.trackColor} onChange={(v) => api.updateCustomProps(c.id, { trackColor: v })} />
+        <ColorInput label="fillColor" id={`${c.id}-fillColor`} value={p.fillColor} onChange={(v) => api.updateCustomProps(c.id, { fillColor: v })} />
         <TextField label="arcWidth" type="number" value={p.arcWidth} onChange={(e) => api.updateCustomProps(c.id, { arcWidth: Math.max(1, Number(e.target.value)) })} size="small" />
       </div>
 
@@ -176,7 +176,7 @@ function GaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React.Re
       <div className="grid grid-cols-2 gap-2 items-center">
         <FormControlLabel control={<Checkbox checked={p.showTicks} onChange={(e) => api.updateCustomProps(c.id, { showTicks: e.target.checked })} />} label="showTicks" />
         <FormControlLabel control={<Checkbox checked={p.showLabels} onChange={(e) => api.updateCustomProps(c.id, { showLabels: e.target.checked })} />} label="showLabels" />
-        <ColorInput id={`${c.id}-tickColor`} value={p.tickColor} onChange={(v) => api.updateCustomProps(c.id, { tickColor: v })} />
+        <ColorInput label="tickColor" id={`${c.id}-tickColor`} value={p.tickColor} onChange={(v) => api.updateCustomProps(c.id, { tickColor: v })} />
         <TextField label="tickLength" type="number" value={p.tickLength} onChange={(e) => api.updateCustomProps(c.id, { tickLength: Math.max(0, Number(e.target.value)) })} size="small" />
         <TextField label="tickWidth" type="number" value={p.tickWidth} onChange={(e) => api.updateCustomProps(c.id, { tickWidth: Math.max(0.5, Number(e.target.value)) })} size="small" />
       </div>
@@ -193,7 +193,7 @@ function GaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React.Re
           onChange={(e) => api.updateCustomProps(c.id, { minorTicksPerInterval: clamp(Math.floor(Number(e.target.value)), 1, 20) })}
           size="small"
         />
-        <ColorInput id={`${c.id}-minorTickColor`} value={p.minorTickColor} onChange={(v) => api.updateCustomProps(c.id, { minorTickColor: v })} />
+        <ColorInput label="minorTickColor" id={`${c.id}-minorTickColor`} value={p.minorTickColor} onChange={(v) => api.updateCustomProps(c.id, { minorTickColor: v })} />
         <TextField
           label="minorTickLength"
           type="number"
@@ -211,7 +211,7 @@ function GaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React.Re
       </div>
 
       <div className="grid grid-cols-2 gap-2 items-center">
-        <ColorInput id={`${c.id}-labelColor`} value={p.labelColor} onChange={(v) => api.updateCustomProps(c.id, { labelColor: v })} />
+        <ColorInput label="labelColor" id={`${c.id}-labelColor`} value={p.labelColor} onChange={(v) => api.updateCustomProps(c.id, { labelColor: v })} />
         <TextField label="labelFontSize" type="number" value={p.labelFontSize} onChange={(e) => api.updateCustomProps(c.id, { labelFontSize: Math.max(6, Number(e.target.value)) })} size="small" />
         <TextField label="labelOffset" type="number" value={p.labelOffset} onChange={(e) => api.updateCustomProps(c.id, { labelOffset: Math.max(0, Number(e.target.value)) })} size="small" />
         <TextField label="labelDecimals" type="number" value={p.labelDecimals} onChange={(e) => api.updateCustomProps(c.id, { labelDecimals: clamp(Math.floor(Number(e.target.value)), 0, 10) })} size="small" />
@@ -230,7 +230,7 @@ function GaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React.Re
           <MenuItem value="arrow">arrow</MenuItem>
           <MenuItem value="circle">circle</MenuItem>
         </TextField>
-        <ColorInput id={`${c.id}-needleColor`} value={p.needleColor} onChange={(v) => api.updateCustomProps(c.id, { needleColor: v })} />
+        <ColorInput label="needleColor" id={`${c.id}-needleColor`} value={p.needleColor} onChange={(v) => api.updateCustomProps(c.id, { needleColor: v })} />
         <TextField
           label="needleLengthRatio"
           type="number"
@@ -261,7 +261,7 @@ function GaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React.Re
           <MenuItem value="center">center</MenuItem>
           <MenuItem value="bottom">bottom</MenuItem>
         </TextField>
-        <ColorInput id={`${c.id}-valueColor`} value={p.valueColor} onChange={(v) => api.updateCustomProps(c.id, { valueColor: v })} />
+        <ColorInput label="valueColor" id={`${c.id}-valueColor`} value={p.valueColor} onChange={(v) => api.updateCustomProps(c.id, { valueColor: v })} />
         <TextField label="valueFontSize" type="number" value={p.valueFontSize} onChange={(e) => api.updateCustomProps(c.id, { valueFontSize: Math.max(6, Number(e.target.value)) })} size="small" />
         <TextField label="valueFontWeight" type="number" value={p.valueFontWeight} onChange={(e) => api.updateCustomProps(c.id, { valueFontWeight: clamp(Math.floor(Number(e.target.value)), 100, 900) })} size="small" />
         <TextField label="valueDecimals" type="number" value={p.valueDecimals} onChange={(e) => api.updateCustomProps(c.id, { valueDecimals: clamp(Math.floor(Number(e.target.value)), 0, 10) })} size="small" />

@@ -80,10 +80,12 @@ function normalizeHex(value: string): string {
 
 export function ColorInput({
   id,
+  label,
   value,
   onChange,
 }: {
   id: string;
+  label?: string;
   value: string;
   onChange: (v: string) => void;
 }) {
@@ -97,7 +99,7 @@ export function ColorInput({
 
   return (
     <div className="flex items-center gap-2">
-      {textInput(id, value, onChange)}
+      <TextField id={id} label={label} fullWidth value={value} onChange={(e) => onChange(e.target.value)} />
       <IconButton
         aria-label="Open color picker"
         onClick={(e) => setAnchorEl(e.currentTarget)}
