@@ -4,7 +4,9 @@ export const BAR_GAUGE_KIND = "barGauge" as const;
 
 export type BarGaugeOrientation = "horizontal" | "vertical";
 export type BarGaugeDirection = "forward" | "reverse";
-export type BarGaugeValuePosition = "center" | "end";
+export type BarGaugeValuePosition = "top-outside" | "below-outside" | "inside-center" | "inside-top" | "inside-bottom";
+export type BarGaugeTickPosition = "auto" | "start" | "end" | "outside";
+export type BarGaugeZonePosition = "auto" | "start" | "end" | "center";
 
 export type BarGaugeZone = {
   from: number;
@@ -20,6 +22,7 @@ export type BarGaugeProps = {
   orientation: BarGaugeOrientation;
   direction: BarGaugeDirection;
   padding: number;
+  borderRadius: number;
 
   backgroundColor: string;
   trackColor: string;
@@ -27,12 +30,17 @@ export type BarGaugeProps = {
   trackRadius: number;
   trackStrokeColor: string;
   trackStrokeWidth: number;
+  fillBorderRadius: number;
 
   // Zones
   zones: BarGaugeZone[];
   zonesCode: string;
   zonesOpacity: number;
   zoneThickness: number;
+  zonePosition: BarGaugeZonePosition;
+  zoneOffsetX: number;
+  zoneOffsetY: number;
+  zoneBorderRadius: number;
 
   // Ticks + labels
   showTicks: boolean;
@@ -40,6 +48,9 @@ export type BarGaugeProps = {
   tickColor: string;
   tickLength: number;
   tickWidth: number;
+  tickPosition: BarGaugeTickPosition;
+  tickOffsetX: number;
+  tickOffsetY: number;
 
   // Minor ticks (between major ticks)
   showMinorTicks: boolean;
@@ -47,12 +58,17 @@ export type BarGaugeProps = {
   minorTickColor: string;
   minorTickLength: number;
   minorTickWidth: number;
+  minorTickPosition: BarGaugeTickPosition;
+  minorTickOffsetX: number;
+  minorTickOffsetY: number;
 
   showLabels: boolean;
   labelColor: string;
   labelFontSize: number;
   labelOffset: number;
   labelDecimals: number;
+  labelOffsetX: number;
+  labelOffsetY: number;
 
   showValueText: boolean;
   valuePosition: BarGaugeValuePosition;
@@ -62,6 +78,8 @@ export type BarGaugeProps = {
   valueDecimals: number;
   valuePrefix: string;
   valueSuffix: string;
+  valueOffsetX: number;
+  valueOffsetY: number;
 
   animate: boolean;
   animateFill: boolean;
@@ -142,6 +160,7 @@ export function coerceBarGaugeProps(raw: Record<string, unknown> | undefined, el
 
   const trackRadius = clamp(num(props.trackRadius, 8), 0, 200);
   const trackStrokeWidth = clamp(num(props.trackStrokeWidth, 0), 0, 50);
+  const fillBorderRadius = clamp(num(props.fillBorderRadius, 0), 0, 200);
 
   const zonesOpacity = clamp(num(props.zonesOpacity, 1), 0, 1);
   const zonesCode = str(props.zonesCode, "");
@@ -155,6 +174,7 @@ export function coerceBarGaugeProps(raw: Record<string, unknown> | undefined, el
       : "[]";
 
   const zoneThickness = clamp(num(props.zoneThickness, Math.max(2, Math.round((el?.height ?? 48) * 0.25))), 1, 400);
+  const zoneBorderRadius = clamp(num(props.zoneBorderRadius, 0), 0, 200);
 
   const numTicks = clamp(Math.floor(num(props.numTicks, 5)), 2, 50);
   const tickLength = clamp(num(props.tickLength, 8), 0, 200);
@@ -167,14 +187,27 @@ export function coerceBarGaugeProps(raw: Record<string, unknown> | undefined, el
 
   const labelFontSize = clamp(num(props.labelFontSize, 10), 6, 64);
   const labelOffset = clamp(num(props.labelOffset, 10), 0, 200);
+  const labelOffsetX = clamp(num(props.labelOffsetX, 0), -200, 200);
+  const labelOffsetY = clamp(num(props.labelOffsetY, 0), -200, 200);
   const labelDecimals = clamp(Math.floor(num(props.labelDecimals, 0)), 0, 10);
 
   const fallbackFont = Math.max(8, Math.min(64, Math.round(Math.min(el?.width ?? 200, el?.height ?? 60) * 0.3)));
   const valueFontSize = clamp(num(props.valueFontSize, fallbackFont), 6, 200);
   const valueFontWeight = clamp(Math.floor(num(props.valueFontWeight, 700)), 100, 900);
+  const valueOffsetX = clamp(num(props.valueOffsetX, 0), -200, 200);
+  const valueOffsetY = clamp(num(props.valueOffsetY, 0), -200, 200);
   const valueDecimals = clamp(Math.floor(num(props.valueDecimals, 0)), 0, 10);
 
-  const valuePosition = oneOf(props.valuePosition, ["center", "end"] as const, "center");
+  const valuePosition = oneOf(props.valuePosition, ["top-outside", "below-outside", "inside-center", "inside-top", "inside-bottom"] as const, "inside-center");
+
+  const tickOffsetX = clamp(num(props.tickOffsetX, 0), -200, 200);
+  const tickOffsetY = clamp(num(props.tickOffsetY, 0), -200, 200);
+  const minorTickOffsetX = clamp(num(props.minorTickOffsetX, 0), -200, 200);
+  const minorTickOffsetY = clamp(num(props.minorTickOffsetY, 0), -200, 200);
+  const zoneOffsetX = clamp(num(props.zoneOffsetX, 0), -200, 200);
+  const zoneOffsetY = clamp(num(props.zoneOffsetY, 0), -200, 200);
+
+  const borderRadius = clamp(num(props.borderRadius, 0), 0, 200);
 
   const animationDuration = clamp(num(props.animationDuration, 0.5), 0, 10);
   const animationEase = str(props.animationEase, "power2.out");
@@ -199,23 +232,28 @@ export function coerceBarGaugeProps(raw: Record<string, unknown> | undefined, el
     zonesCode: normalizedZonesCode,
     zonesOpacity,
     zoneThickness,
+    zonePosition: oneOf(props.zonePosition, ["auto", "start", "end", "center"] as const, "auto"),
 
     showTicks: bool(props.showTicks, true),
     numTicks,
     tickColor: str(props.tickColor, "var(--foreground)"),
     tickLength,
     tickWidth,
+    tickPosition: oneOf(props.tickPosition, ["auto", "start", "end", "outside"] as const, "auto"),
 
     showMinorTicks,
     minorTicksPerInterval,
     minorTickColor: str(props.minorTickColor, str(props.tickColor, "var(--foreground)")),
     minorTickLength,
     minorTickWidth,
+    minorTickPosition: oneOf(props.minorTickPosition, ["auto", "start", "end", "outside"] as const, "auto"),
 
     showLabels: bool(props.showLabels, false),
     labelColor: str(props.labelColor, "var(--foreground)"),
     labelFontSize,
     labelOffset,
+    labelOffsetX,
+    labelOffsetY,
     labelDecimals,
 
     showValueText: bool(props.showValueText, true),
@@ -223,9 +261,22 @@ export function coerceBarGaugeProps(raw: Record<string, unknown> | undefined, el
     valueColor: str(props.valueColor, "var(--foreground)"),
     valueFontSize,
     valueFontWeight,
+    valueOffsetX,
+    valueOffsetY,
     valueDecimals,
     valuePrefix: str(props.valuePrefix, ""),
     valueSuffix: str(props.valueSuffix, ""),
+
+    tickOffsetX,
+    tickOffsetY,
+    minorTickOffsetX,
+    minorTickOffsetY,
+    zoneOffsetX,
+    zoneOffsetY,
+
+    borderRadius,
+    fillBorderRadius,
+    zoneBorderRadius,
 
     animate: bool(props.animate, true),
     animateFill: bool(props.animateFill, true),

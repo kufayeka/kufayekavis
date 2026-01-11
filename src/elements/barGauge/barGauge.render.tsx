@@ -144,13 +144,24 @@ function BarGaugeInner({ el }: { el: CustomElement }) {
 
   const valueTextPos = useMemo(() => {
     const center = { x: tx + tw / 2, y: ty + th / 2 };
-    if (p.valuePosition === "center") return center;
+    if (p.valuePosition === "inside-center") return center;
 
     if (p.orientation === "horizontal") {
+      if (p.valuePosition === "inside-top") return { x: tx + tw / 2, y: ty + th * 0.25 };
+      if (p.valuePosition === "inside-bottom") return { x: tx + tw / 2, y: ty + th * 0.75 };
+      if (p.valuePosition === "top-outside") return { x: tx + tw / 2, y: ty - th * 0.25 };
+      if (p.valuePosition === "below-outside") return { x: tx + tw / 2, y: ty + th * 1.25 };
+      // fallback to end
       const x = p.direction === "reverse" ? tx + tw * 0.1 : tx + tw * 0.9;
       return { x, y: center.y };
     }
 
+    // vertical
+    if (p.valuePosition === "inside-top") return { x: tx + tw / 2, y: ty + th * 0.25 };
+    if (p.valuePosition === "inside-bottom") return { x: tx + tw / 2, y: ty + th * 0.75 };
+    if (p.valuePosition === "top-outside") return { x: tx + tw / 2, y: ty - th * 0.25 };
+    if (p.valuePosition === "below-outside") return { x: tx + tw / 2, y: ty + th * 1.25 };
+    // fallback
     const y = p.direction === "reverse" ? ty + th * 0.9 : ty + th * 0.1;
     return { x: center.x, y };
   }, [p.valuePosition, p.orientation, p.direction, tx, ty, tw, th]);
@@ -161,7 +172,7 @@ function BarGaugeInner({ el }: { el: CustomElement }) {
   const initFill = targetFill;
 
   const maxRx = Math.min(safeTrackRadius, tw / 2, th / 2);
-  const fillMaxRx = Math.min(safeTrackRadius, Math.max(0, initFill.width) / 2, Math.max(0, initFill.height) / 2);
+  const fillMaxRx = Math.min(p.fillBorderRadius, Math.max(0, initFill.width) / 2, Math.max(0, initFill.height) / 2);
 
   const axisPos = useMemo(() => {
     const majorCount = Math.max(2, p.numTicks);
@@ -199,14 +210,42 @@ function BarGaugeInner({ el }: { el: CustomElement }) {
   const zoneThickness = Math.max(1, Math.min(p.zoneThickness, p.orientation === "horizontal" ? th : tw));
   const zoneRect = useMemo(() => {
     if (p.orientation === "horizontal") {
-      return { x: tx, y: ty + (th - zoneThickness) / 2, width: tw, height: zoneThickness };
+      let y: number;
+      switch (p.zonePosition) {
+        case "start":
+          y = ty;
+          break;
+        case "end":
+          y = ty + th - zoneThickness;
+          break;
+        case "center":
+        case "auto":
+        default:
+          y = ty + (th - zoneThickness) / 2;
+          break;
+      }
+      return { x: tx, y, width: tw, height: zoneThickness };
     }
-    return { x: tx + (tw - zoneThickness) / 2, y: ty, width: zoneThickness, height: th };
-  }, [p.orientation, tx, ty, tw, th, zoneThickness]);
+    let x: number;
+    switch (p.zonePosition) {
+      case "start":
+        x = tx;
+        break;
+      case "end":
+        x = tx + tw - zoneThickness;
+        break;
+      case "center":
+      case "auto":
+      default:
+        x = tx + (tw - zoneThickness) / 2;
+        break;
+    }
+    return { x, y: ty, width: zoneThickness, height: th };
+  }, [p.orientation, p.zonePosition, tx, ty, tw, th, zoneThickness]);
 
   return (
     <>
-      <rect x={0} y={0} width={w} height={h} fill={p.backgroundColor} />
+      <rect x={0} y={0} width={w} height={h} rx={p.borderRadius} ry={p.borderRadius} fill={p.backgroundColor} />
 
       <rect
         x={tx}
@@ -248,9 +287,11 @@ function BarGaugeInner({ el }: { el: CustomElement }) {
                 <rect
                   key={`zone-${idx}-${z.from}-${z.to}`}
                   x={x0}
-                  y={zoneRect.y}
+                  y={zoneRect.y + p.zoneOffsetY}
                   width={Math.max(0, x1 - x0)}
                   height={zoneRect.height}
+                  rx={p.zoneBorderRadius}
+                  ry={p.zoneBorderRadius}
                   fill={z.color}
                 />
               );
@@ -261,10 +302,12 @@ function BarGaugeInner({ el }: { el: CustomElement }) {
             return (
               <rect
                 key={`zone-${idx}-${z.from}-${z.to}`}
-                x={zoneRect.x}
-                y={y0}
+                x={zoneRect.x + p.zoneOffsetX}
+                y={y0 + p.zoneOffsetY}
                 width={zoneRect.width}
                 height={Math.max(0, y1 - y0)}
+                rx={p.zoneBorderRadius}
+                ry={p.zoneBorderRadius}
                 fill={z.color}
               />
             );
@@ -279,17 +322,38 @@ function BarGaugeInner({ el }: { el: CustomElement }) {
 
           if (p.orientation === "horizontal") {
             const x = pt.x;
-            const y0 = ty;
-            const y1 = ty - p.tickLength;
-            const labelY = y1 - p.labelOffset;
+            let y0: number, y1: number, labelY: number;
+            switch (p.tickPosition) {
+              case "start":
+                y0 = ty;
+                y1 = ty + p.tickLength;
+                labelY = y1 + p.labelOffset;
+                break;
+              case "end":
+                y0 = ty + th;
+                y1 = ty + th - p.tickLength;
+                labelY = y1 - p.labelOffset;
+                break;
+              case "outside":
+                y0 = ty - p.tickLength;
+                y1 = ty;
+                labelY = y0 - p.labelOffset;
+                break;
+              case "auto":
+              default:
+                y0 = ty;
+                y1 = ty - p.tickLength;
+                labelY = y1 - p.labelOffset;
+                break;
+            }
             const val = lerp(p.min, p.max, t);
             return (
               <g key={key}>
-                <line x1={x} y1={y0} x2={x} y2={y1} stroke={p.tickColor} strokeWidth={p.tickWidth} />
+                <line x1={x + p.tickOffsetX} y1={y0 + p.tickOffsetY} x2={x + p.tickOffsetX} y2={y1 + p.tickOffsetY} stroke={p.tickColor} strokeWidth={p.tickWidth} />
                 {p.showLabels && (
                   <text
-                    x={x}
-                    y={labelY}
+                    x={x + p.labelOffsetX}
+                    y={labelY + p.labelOffsetY}
                     textAnchor="middle"
                     dominantBaseline="middle"
                     fill={p.labelColor}
@@ -304,17 +368,38 @@ function BarGaugeInner({ el }: { el: CustomElement }) {
           }
 
           const y = pt.y;
-          const x0 = tx + tw;
-          const x1 = tx + tw + p.tickLength;
-          const labelX = x1 + p.labelOffset;
+          let x0: number, x1: number, labelX: number;
+          switch (p.tickPosition) {
+            case "start":
+              x0 = tx;
+              x1 = tx - p.tickLength;
+              labelX = x1 - p.labelOffset;
+              break;
+            case "end":
+              x0 = tx + tw;
+              x1 = tx + tw + p.tickLength;
+              labelX = x1 + p.labelOffset;
+              break;
+            case "outside":
+              x0 = tx + tw + p.tickLength;
+              x1 = tx + tw;
+              labelX = x0 + p.labelOffset;
+              break;
+            case "auto":
+            default:
+              x0 = tx + tw;
+              x1 = tx + tw + p.tickLength;
+              labelX = x1 + p.labelOffset;
+              break;
+          }
           const val = lerp(p.min, p.max, t);
           return (
             <g key={key}>
-              <line x1={x0} y1={y} x2={x1} y2={y} stroke={p.tickColor} strokeWidth={p.tickWidth} />
+              <line x1={x0 + p.tickOffsetX} y1={y + p.tickOffsetY} x2={x1 + p.tickOffsetX} y2={y + p.tickOffsetY} stroke={p.tickColor} strokeWidth={p.tickWidth} />
               {p.showLabels && (
                 <text
-                  x={labelX}
-                  y={y}
+                  x={labelX + p.labelOffsetX}
+                  y={y + p.labelOffsetY}
                   textAnchor="start"
                   dominantBaseline="middle"
                   fill={p.labelColor}
@@ -336,21 +421,57 @@ function BarGaugeInner({ el }: { el: CustomElement }) {
 
           if (p.orientation === "horizontal") {
             const x = pt.x;
-            const y0 = ty;
-            const y1 = ty - p.minorTickLength;
-            return <line key={key} x1={x} y1={y0} x2={x} y2={y1} stroke={p.minorTickColor} strokeWidth={p.minorTickWidth} opacity={0.85} />;
+            let y0: number, y1: number;
+            switch (p.minorTickPosition) {
+              case "start":
+                y0 = ty;
+                y1 = ty + p.minorTickLength;
+                break;
+              case "end":
+                y0 = ty + th;
+                y1 = ty + th - p.minorTickLength;
+                break;
+              case "outside":
+                y0 = ty - p.minorTickLength;
+                y1 = ty;
+                break;
+              case "auto":
+              default:
+                y0 = ty;
+                y1 = ty - p.minorTickLength;
+                break;
+            }
+            return <line key={key} x1={x + p.minorTickOffsetX} y1={y0 + p.minorTickOffsetY} x2={x + p.minorTickOffsetX} y2={y1 + p.minorTickOffsetY} stroke={p.minorTickColor} strokeWidth={p.minorTickWidth} opacity={0.85} />;
           }
 
           const y = pt.y;
-          const x0 = tx + tw;
-          const x1 = tx + tw + p.minorTickLength;
-          return <line key={key} x1={x0} y1={y} x2={x1} y2={y} stroke={p.minorTickColor} strokeWidth={p.minorTickWidth} opacity={0.85} />;
+          let x0: number, x1: number;
+          switch (p.minorTickPosition) {
+            case "start":
+              x0 = tx;
+              x1 = tx - p.minorTickLength;
+              break;
+            case "end":
+              x0 = tx + tw;
+              x1 = tx + tw + p.minorTickLength;
+              break;
+            case "outside":
+              x0 = tx + tw + p.minorTickLength;
+              x1 = tx + tw;
+              break;
+            case "auto":
+            default:
+              x0 = tx + tw;
+              x1 = tx + tw + p.minorTickLength;
+              break;
+          }
+          return <line key={key} x1={x0 + p.minorTickOffsetX} y1={y + p.minorTickOffsetY} x2={x1 + p.minorTickOffsetX} y2={y + p.minorTickOffsetY} stroke={p.minorTickColor} strokeWidth={p.minorTickWidth} opacity={0.85} />;
         })}
 
       {p.showValueText && (
         <text
-          x={valueTextPos.x}
-          y={valueTextPos.y}
+          x={valueTextPos.x + p.valueOffsetX}
+          y={valueTextPos.y + p.valueOffsetY}
           textAnchor="middle"
           dominantBaseline="middle"
           fill={p.valueColor}

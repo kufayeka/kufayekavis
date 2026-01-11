@@ -11,6 +11,8 @@ export type DragMode =
       ids: ElementId[];
       startElements: Record<ElementId, DesignerElement>;
       startBox: { x: number; y: number; width: number; height: number } | null;
+      lastDx: number;
+      lastDy: number;
     }
   | {
       kind: "marquee";

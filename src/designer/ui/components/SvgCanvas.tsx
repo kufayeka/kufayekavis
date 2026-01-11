@@ -169,6 +169,17 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
     [state.doc.canvas.height, state.doc.canvas.width],
   );
 
+  // Keep latest helpers in refs so we can register pointer listeners only once.
+  const engineRef = useRef(engine);
+  useEffect(() => {
+    engineRef.current = engine;
+  }, [engine]);
+
+  const clientToCanvasRef = useRef(clientToCanvas);
+  useEffect(() => {
+    clientToCanvasRef.current = clientToCanvas;
+  }, [clientToCanvas]);
+
   const snapIfEnabled = useCallback(
     (x: number, y: number) => {
       const s = engine.getState();
@@ -181,6 +192,11 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
     },
     [engine],
   );
+
+  const snapIfEnabledRef = useRef(snapIfEnabled);
+  useEffect(() => {
+    snapIfEnabledRef.current = snapIfEnabled;
+  }, [snapIfEnabled]);
 
   const getMovableIds = useCallback(
     (ids: ElementId[]): ElementId[] => {
@@ -229,13 +245,40 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
     [engine],
   );
 
+  const finalizeMarqueeSelectionRef = useRef(finalizeMarqueeSelection);
   useEffect(() => {
-    const onPointerMove = (e: PointerEvent) => {
+    finalizeMarqueeSelectionRef.current = finalizeMarqueeSelection;
+  }, [finalizeMarqueeSelection]);
+
+  const overlayInsetsRef = useRef(overlayInsets);
+  useEffect(() => {
+    overlayInsetsRef.current = overlayInsets;
+  }, [overlayInsets]);
+
+  const contentLayoutRef = useRef(contentLayout);
+  useEffect(() => {
+    contentLayoutRef.current = contentLayout;
+  }, [contentLayout]);
+
+  useEffect(() => {
+    let rafId: number | null = null;
+    let pending: null | { clientX: number; clientY: number } = null;
+
+    const processMove = () => {
+      rafId = null;
+      const ev = pending;
+      pending = null;
+      if (!ev) return;
+
       const drag = dragRef.current;
       if (drag.kind === "none") return;
 
+      const engine = engineRef.current;
+      const clientToCanvas = clientToCanvasRef.current;
+      const snapIfEnabled = snapIfEnabledRef.current;
+
       if (drag.kind === "move") {
-        const p = clientToCanvas(e.clientX, e.clientY);
+        const p = clientToCanvas(ev.clientX, ev.clientY);
         const totalDx = p.x - drag.originX;
         const totalDy = p.y - drag.originY;
 
@@ -252,18 +295,21 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
           dy = snappedY - drag.startBox.y;
         }
 
-        engine.updateElements(drag.ids, (current) => {
-          const start = drag.startElements[current.id];
-          if (!start) return current;
-          return translateElement(start, dx, dy);
-        });
+        // Update visual
+        for (const id of drag.ids) {
+          const el = elRefs.current.get(id);
+          if (el) {
+            el.style.transform = `translate(${dx}px, ${dy}px)`;
+          }
+        }
 
-        dragRef.current = { ...drag, startX: p.x, startY: p.y };
+        // Update drag state
+        dragRef.current = { ...drag, lastDx: dx, lastDy: dy };
         return;
       }
 
       if (drag.kind === "marquee") {
-        const p = clientToCanvas(e.clientX, e.clientY);
+        const p = clientToCanvas(ev.clientX, ev.clientY);
         const next = { ...drag, x: p.x, y: p.y } as DragMode;
         dragRef.current = next;
         setDragUi(next);
@@ -271,7 +317,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       }
 
       if (drag.kind === "resize-rect") {
-        const p = clientToCanvas(e.clientX, e.clientY);
+        const p = clientToCanvas(ev.clientX, ev.clientY);
         const rawDx = p.x - drag.startX;
         const rawDy = p.y - drag.startY;
         const { dx, dy } = rotateDelta(rawDx, rawDy, -drag.startRotation);
@@ -292,8 +338,9 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
           y = drag.start.y + dy;
         }
 
-        if (engine.getState().doc.canvas.snapToGrid) {
-          const g = Math.max(1, engine.getState().doc.canvas.gridSize || 1);
+        const s = engine.getState();
+        if (s.doc.canvas.snapToGrid) {
+          const g = Math.max(1, s.doc.canvas.gridSize || 1);
           x = Math.round(x / g) * g;
           y = Math.round(y / g) * g;
           w = Math.max(1, Math.round(w / g) * g);
@@ -305,12 +352,11 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       }
 
       if (drag.kind === "resize-text") {
-        const p = clientToCanvas(e.clientX, e.clientY);
+        const p = clientToCanvas(ev.clientX, ev.clientY);
         const rawDx = p.x - drag.startX;
         const rawDy = p.y - drag.startY;
         const { dx, dy } = rotateDelta(rawDx, rawDy, -drag.startRotation);
 
-        // Simple scaling heuristic: dragging down/right increases font, up/left decreases.
         const signX = drag.handle.includes("w") ? -1 : 1;
         const signY = drag.handle.includes("n") ? -1 : 1;
         const delta = (signX * dx + signY * dy) / 6;
@@ -320,7 +366,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       }
 
       if (drag.kind === "rotate") {
-        const p = clientToCanvas(e.clientX, e.clientY);
+        const p = clientToCanvas(ev.clientX, ev.clientY);
         const angle = Math.atan2(p.y - drag.center.y, p.x - drag.center.x);
         const delta = ((angle - drag.startAngle) * 180) / Math.PI;
         engine.updateElement(drag.id, { rotation: drag.startRotation + delta });
@@ -328,7 +374,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       }
 
       if (drag.kind === "line-end") {
-        const p = clientToCanvas(e.clientX, e.clientY);
+        const p = clientToCanvas(ev.clientX, ev.clientY);
         const sp = snapIfEnabled(p.x, p.y);
         const cur = engine.getState().doc.elements[drag.id];
         if (!cur) return;
@@ -340,7 +386,6 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
         }
 
         if (cur.type === "custom" && cur.kind === MOTION_PATH_LINE_KIND) {
-          // Convert canvas coord -> local element coord
           const nextLocal = { x: sp.x - cur.x, y: sp.y - cur.y };
           const patch = patchMotionPathLineEndpoint({ el: cur, end: drag.end, nextLocal });
           engine.updateElement(drag.id, patch as unknown as Partial<DesignerElement>);
@@ -351,7 +396,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       }
 
       if (drag.kind === "circle-r") {
-        const p = clientToCanvas(e.clientX, e.clientY);
+        const p = clientToCanvas(ev.clientX, ev.clientY);
         const el = engine.getState().doc.elements[drag.id];
         if (!el || el.type !== "circle") return;
         const sp = snapIfEnabled(p.x, p.y);
@@ -361,7 +406,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       }
 
       if (drag.kind === "free") {
-        const p = clientToCanvas(e.clientX, e.clientY);
+        const p = clientToCanvas(ev.clientX, ev.clientY);
         const next = { ...drag, points: [...drag.points, { x: p.x, y: p.y }] } as DragMode;
         dragRef.current = next;
         setDragUi(next);
@@ -369,7 +414,21 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       }
     };
 
+    const onPointerMove = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (drag.kind === "none") return;
+      pending = { clientX: e.clientX, clientY: e.clientY };
+      if (rafId == null) rafId = window.requestAnimationFrame(processMove);
+    };
+
     const onPointerUp = () => {
+      if (rafId != null) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      pending = null;
+
+      const engine = engineRef.current;
       const drag = dragRef.current;
 
       if (drag.kind === "free") {
@@ -388,6 +447,19 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
         engine.endHistoryBatch();
       }
 
+      if (drag.kind === "move") {
+        engine.updateElements(drag.ids, (current) => {
+          const start = drag.startElements[current.id];
+          if (!start) return current;
+          return translateElement(start, drag.lastDx, drag.lastDy);
+        });
+        // Reset visual
+        for (const id of drag.ids) {
+          const el = elRefs.current.get(id);
+          if (el) el.style.transform = '';
+        }
+      }
+
       if (drag.kind === "marquee") {
         const tool = engine.getState().tool;
         const startX = drag.startX;
@@ -395,7 +467,6 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
         const endX = drag.x;
         const endY = drag.y;
         if (tool === "magnifier") {
-          // compute box in canvas units
           const x1 = Math.min(startX, endX);
           const y1 = Math.min(startY, endY);
           const x2 = Math.max(startX, endX);
@@ -404,33 +475,29 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
 
           const scroller = scrollRef.current;
           const svg = svgRef.current;
+          const overlayInsets = overlayInsetsRef.current;
+          const contentLayout = contentLayoutRef.current;
           if (scroller && svg && box.width > 0 && box.height > 0) {
             const containerRect = scroller.getBoundingClientRect();
             const visibleW = Math.max(1, scroller.clientWidth - overlayInsets.left - overlayInsets.right);
             const visibleH = Math.max(1, scroller.clientHeight - overlayInsets.top - overlayInsets.bottom);
             const oldScale = engine.getState().zoom.scale;
-            const suggested = Math.min(
-              visibleW / Math.max(1, box.width),
-              visibleH / Math.max(1, box.height),
-            );
+            const suggested = Math.min(visibleW / Math.max(1, box.width), visibleH / Math.max(1, box.height));
 
-            // compute overlay position (center of selection in client coords)
             const centerX = box.x + box.width / 2;
             const centerY = box.y + box.height / 2;
             const centerClientX = containerRect.left + contentLayout.originOffsetX + centerX * oldScale - scroller.scrollLeft;
             const centerClientY = containerRect.top + contentLayout.originOffsetY + centerY * oldScale - scroller.scrollTop;
 
-            // position relative to scroller
             const left = centerClientX - containerRect.left;
             const top = centerClientY - containerRect.top;
 
             setPendingMagnifier({ box, suggestedScale: suggested, left, top });
           } else {
-            // fallback: just select
-            finalizeMarqueeSelection(startX, startY, endX, endY, drag.append);
+            finalizeMarqueeSelectionRef.current(startX, startY, endX, endY, drag.append);
           }
         } else {
-          finalizeMarqueeSelection(drag.startX, drag.startY, drag.x, drag.y, drag.append);
+          finalizeMarqueeSelectionRef.current(drag.startX, drag.startY, drag.x, drag.y, drag.append);
         }
       }
 
@@ -441,21 +508,11 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     return () => {
+      if (rafId != null) window.cancelAnimationFrame(rafId);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
-  }, [
-    clientToCanvas,
-    contentLayout.originOffsetX,
-    contentLayout.originOffsetY,
-    engine,
-    finalizeMarqueeSelection,
-    overlayInsets.bottom,
-    overlayInsets.left,
-    overlayInsets.right,
-    overlayInsets.top,
-    snapIfEnabled,
-  ]);
+  }, []);
 
   const onCanvasPointerDown = (e: React.PointerEvent) => {
     // In view mode we don't allow selection/movement, but we still want pointer events
@@ -571,6 +628,8 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       ids: movableIds,
       startElements,
       startBox: getSelectionBBox(movableIds, engine.getState().doc),
+      lastDx: 0,
+      lastDy: 0,
     };
     setDragUi({
       kind: "move",
@@ -581,6 +640,8 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       ids: movableIds,
       startElements,
       startBox: getSelectionBBox(movableIds, engine.getState().doc),
+      lastDx: 0,
+      lastDy: 0,
     });
   };
 
@@ -648,79 +709,85 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
     e.dataTransfer.dropEffect = "copy";
   };
 
-  // Handle OS clipboard paste (images, data URLs, SVG text)
-  useEffect(() => {
-    const onPaste = async (e: ClipboardEvent) => {
-      if (engine.getState().viewMode) return;
-      const cb = e.clipboardData;
-      if (!cb) return;
+  // Handle OS clipboard paste (images, data URLs, SVG text) - DISABLED to avoid conflicts with text copy/paste
+  // useEffect(() => {
+  //   const onPaste = async (e: ClipboardEvent) => {
+  //     if (engine.getState().viewMode) return;
+  //     const cb = e.clipboardData;
+  //     if (!cb) return;
 
-      // Helper to compute center canvas point
-      const getCenter = () => {
-        const scroller = scrollRef.current;
-        let x = state.doc.canvas.width / 2;
-        let y = state.doc.canvas.height / 2;
-        if (scroller) {
-          const visibleW = Math.max(1, scroller.clientWidth - overlayInsets.left - overlayInsets.right);
-          const visibleH = Math.max(1, scroller.clientHeight - overlayInsets.top - overlayInsets.bottom);
-          const centerPxX = scroller.scrollLeft + overlayInsets.left + visibleW / 2;
-          const centerPxY = scroller.scrollTop + overlayInsets.top + visibleH / 2;
-          const contentPxX = clamp(centerPxX - contentLayout.originOffsetX, 0, state.doc.canvas.width * state.zoom.scale);
-          const contentPxY = clamp(centerPxY - contentLayout.originOffsetY, 0, state.doc.canvas.height * state.zoom.scale);
-          x = contentPxX / state.zoom.scale;
-          y = contentPxY / state.zoom.scale;
-        }
-        return { x, y };
-      };
+  //     // If pasting into an input field, let the browser handle it normally
+  //     const target = e.target as Element;
+  //     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true')) {
+  //       return;
+  //     }
 
-      // First handle files (recommended when user copied an OS file)
-      if (cb.files && cb.files.length > 0) {
-        e.preventDefault();
-        for (const file of Array.from(cb.files)) {
-          if (!file.type.startsWith("image/") && !file.name.toLowerCase().endsWith(".svg")) continue;
-          const href = await fileToDataUrl(file);
-          const { x, y } = getCenter();
-          engine.createElement({ type: "image", x, y, href });
-        }
-        return;
-      }
+  //     // Helper to compute center canvas point
+  //     const getCenter = () => {
+  //       const scroller = scrollRef.current;
+  //       let x = state.doc.canvas.width / 2;
+  //       let y = state.doc.canvas.height / 2;
+  //       if (scroller) {
+  //         const visibleW = Math.max(1, scroller.clientWidth - overlayInsets.left - overlayInsets.right);
+  //         const visibleH = Math.max(1, scroller.clientHeight - overlayInsets.top - overlayInsets.bottom);
+  //         const centerPxX = scroller.scrollLeft + overlayInsets.left + visibleW / 2;
+  //         const centerPxY = scroller.scrollTop + overlayInsets.top + visibleH / 2;
+  //         const contentPxX = clamp(centerPxX - contentLayout.originOffsetX, 0, state.doc.canvas.width * state.zoom.scale);
+  //         const contentPxY = clamp(centerPxY - contentLayout.originOffsetY, 0, state.doc.canvas.height * state.zoom.scale);
+  //         x = contentPxX / state.zoom.scale;
+  //         y = contentPxY / state.zoom.scale;
+  //       }
+  //       return { x, y };
+  //     };
 
-      // Next, inspect DataTransferItemList for string content (more reliable)
-      const items = Array.from(cb.items || []);
-      for (const item of items) {
-        if (item.kind === "string") {
-          // Promisify getAsString
-          const text = await new Promise<string>((resolve) => item.getAsString((s) => resolve(s || "")));
-          const trimmed = text.trim();
-          if (!trimmed) continue;
-          // data URL or direct image URL
-          if (/^data:image\//i.test(trimmed) || /^https?:\/\/.+\.(png|jpe?g|svg)$/i.test(trimmed)) {
-            e.preventDefault();
-            const { x, y } = getCenter();
-            engine.createElement({ type: "image", x, y, href: trimmed });
-            return;
-          }
-          // Raw SVG markup
-          if (trimmed.startsWith("<svg")) {
-            e.preventDefault();
-            const href = "data:image/svg+xml;utf8," + encodeURIComponent(trimmed);
-            const { x, y } = getCenter();
-            engine.createElement({ type: "image", x, y, href });
-            return;
-          }
-        }
-      }
+  //     // First handle files (recommended when user copied an OS file)
+  //     if (cb.files && cb.files.length > 0) {
+  //       e.preventDefault();
+  //       for (const file of Array.from(cb.files)) {
+  //         if (!file.type.startsWith("image/") && !file.name.toLowerCase().endsWith(".svg")) continue;
+  //         const href = await fileToDataUrl(file);
+  //         const { x, y } = getCenter();
+  //         engine.createElement({ type: "image", x, y, href });
+  //       }
+  //       return;
+  //     }
 
-      // If we found no external clipboard content, fall back to engine clipboard
-      try {
-        e.preventDefault();
-      } catch {}
-      engine.pasteClipboard();
-    };
+  //     // Next, inspect DataTransferItemList for string content (more reliable)
+  //     const items = Array.from(cb.items || []);
+  //     for (const item of items) {
+  //       if (item.kind === "string") {
+  //         // Promisify getAsString
+  //         const text = await new Promise<string>((resolve) => item.getAsString((s) => resolve(s || "")));
+  //         const trimmed = text.trim();
+  //         if (!trimmed) continue;
+  //         // data URL or direct image URL
+  //         if (/^data:image\//i.test(trimmed) || /^https?:\/\/.+\.(png|jpe?g|svg)$/i.test(trimmed)) {
+  //           e.preventDefault();
+  //           const { x, y } = getCenter();
+  //           engine.createElement({ type: "image", x, y, href: trimmed });
+  //           return;
+  //         }
+  //         // Raw SVG markup
+  //         if (trimmed.startsWith("<svg")) {
+  //           e.preventDefault();
+  //           const href = "data:image/svg+xml;utf8," + encodeURIComponent(trimmed);
+  //           const { x, y } = getCenter();
+  //           engine.createElement({ type: "image", x, y, href });
+  //           return;
+  //         }
+  //       }
+  //     }
 
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [contentLayout.originOffsetX, contentLayout.originOffsetY, engine, overlayInsets.bottom, overlayInsets.left, overlayInsets.right, overlayInsets.top, state.doc.canvas.height, state.doc.canvas.width, state.zoom.scale]);
+  //     // If we found no external clipboard content, fall back to engine clipboard
+  //     try {
+  //       e.preventDefault();
+  //     } catch {}
+  //     engine.pasteClipboard();
+  //   };
+
+  //   window.addEventListener("paste", onPaste);
+  //   return () => window.removeEventListener("paste", onPaste);
+  // }, [contentLayout.originOffsetX, contentLayout.originOffsetY, engine, overlayInsets.bottom, overlayInsets.left, overlayInsets.right, overlayInsets.top, state.doc.canvas.height, state.doc.canvas.width, state.zoom.scale]);
 
   // Keep container size for centering calculations.
   useEffect(() => {

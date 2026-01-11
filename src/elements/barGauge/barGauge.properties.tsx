@@ -105,7 +105,7 @@ function BarGaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React
           error={Boolean(zonesError)}
           helperText={zonesError ?? "Example: [{\"from\":0,\"to\":60,\"color\":\"#00ff00\"}, ...]"}
         />
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-end gap-2 flex-wrap">
           <Button size="small" variant="outlined" onClick={applyZones}>
             Apply zones
           </Button>
@@ -123,7 +123,21 @@ function BarGaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React
             value={p.zoneThickness}
             onChange={(e) => api.updateCustomProps(c.id, { zoneThickness: Math.max(1, Number(e.target.value)) })}
           />
+          <TextField select label="zonePosition" value={p.zonePosition} onChange={(e) => api.updateCustomProps(c.id, { zonePosition: e.target.value })} size="small">
+            <MenuItem value="auto">auto</MenuItem>
+            <MenuItem value="start">start</MenuItem>
+            <MenuItem value="end">end</MenuItem>
+            <MenuItem value="center">center</MenuItem>
+          </TextField>
+          <TextField label="zoneOffsetX" type="number" value={p.zoneOffsetX} onChange={(e) => api.updateCustomProps(c.id, { zoneOffsetX: clamp(Number(e.target.value), -200, 200) })} size="small" />
+          <TextField label="zoneOffsetY" type="number" value={p.zoneOffsetY} onChange={(e) => api.updateCustomProps(c.id, { zoneOffsetY: clamp(Number(e.target.value), -200, 200) })} size="small" />
         </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 items-center">
+        <TextField label="borderRadius" type="number" value={p.borderRadius} onChange={(e) => api.updateCustomProps(c.id, { borderRadius: clamp(Number(e.target.value), 0, 200) })} size="small" />
+        <TextField label="fillBorderRadius" type="number" value={p.fillBorderRadius} onChange={(e) => api.updateCustomProps(c.id, { fillBorderRadius: clamp(Number(e.target.value), 0, 200) })} size="small" />
+        <TextField label="zoneBorderRadius" type="number" value={p.zoneBorderRadius} onChange={(e) => api.updateCustomProps(c.id, { zoneBorderRadius: clamp(Number(e.target.value), 0, 200) })} size="small" />
       </div>
 
       <div className="grid grid-cols-2 gap-2 items-center">
@@ -138,6 +152,14 @@ function BarGaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React
         <ColorInput label="tickColor" id={`${c.id}-bar-tickColor`} value={p.tickColor} onChange={(v) => api.updateCustomProps(c.id, { tickColor: v })} />
         <TextField label="tickLength" type="number" value={p.tickLength} onChange={(e) => api.updateCustomProps(c.id, { tickLength: Math.max(0, Number(e.target.value)) })} size="small" />
         <TextField label="tickWidth" type="number" value={p.tickWidth} onChange={(e) => api.updateCustomProps(c.id, { tickWidth: Math.max(0.5, Number(e.target.value)) })} size="small" />
+        <TextField select label="tickPosition" value={p.tickPosition} onChange={(e) => api.updateCustomProps(c.id, { tickPosition: e.target.value })} size="small">
+          <MenuItem value="auto">auto</MenuItem>
+          <MenuItem value="start">start</MenuItem>
+          <MenuItem value="end">end</MenuItem>
+          <MenuItem value="outside">outside</MenuItem>
+        </TextField>
+        <TextField label="tickOffsetX" type="number" value={p.tickOffsetX} onChange={(e) => api.updateCustomProps(c.id, { tickOffsetX: clamp(Number(e.target.value), -200, 200) })} size="small" />
+        <TextField label="tickOffsetY" type="number" value={p.tickOffsetY} onChange={(e) => api.updateCustomProps(c.id, { tickOffsetY: clamp(Number(e.target.value), -200, 200) })} size="small" />
       </div>
 
       <div className="grid grid-cols-2 gap-2 items-center">
@@ -155,6 +177,14 @@ function BarGaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React
         <ColorInput label="minorTickColor" id={`${c.id}-bar-minorTickColor`} value={p.minorTickColor} onChange={(v) => api.updateCustomProps(c.id, { minorTickColor: v })} />
         <TextField label="minorTickLength" type="number" value={p.minorTickLength} onChange={(e) => api.updateCustomProps(c.id, { minorTickLength: Math.max(0, Number(e.target.value)) })} size="small" />
         <TextField label="minorTickWidth" type="number" value={p.minorTickWidth} onChange={(e) => api.updateCustomProps(c.id, { minorTickWidth: Math.max(0.25, Number(e.target.value)) })} size="small" />
+        <TextField select label="minorTickPosition" value={p.minorTickPosition} onChange={(e) => api.updateCustomProps(c.id, { minorTickPosition: e.target.value })} size="small">
+          <MenuItem value="auto">auto</MenuItem>
+          <MenuItem value="start">start</MenuItem>
+          <MenuItem value="end">end</MenuItem>
+          <MenuItem value="outside">outside</MenuItem>
+        </TextField>
+        <TextField label="minorTickOffsetX" type="number" value={p.minorTickOffsetX} onChange={(e) => api.updateCustomProps(c.id, { minorTickOffsetX: clamp(Number(e.target.value), -200, 200) })} size="small" />
+        <TextField label="minorTickOffsetY" type="number" value={p.minorTickOffsetY} onChange={(e) => api.updateCustomProps(c.id, { minorTickOffsetY: clamp(Number(e.target.value), -200, 200) })} size="small" />
       </div>
 
       <div className="grid grid-cols-2 gap-2 items-center">
@@ -162,18 +192,25 @@ function BarGaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React
         <ColorInput label="labelColor" id={`${c.id}-bar-labelColor`} value={p.labelColor} onChange={(v) => api.updateCustomProps(c.id, { labelColor: v })} />
         <TextField label="labelFontSize" type="number" value={p.labelFontSize} onChange={(e) => api.updateCustomProps(c.id, { labelFontSize: Math.max(6, Number(e.target.value)) })} size="small" />
         <TextField label="labelOffset" type="number" value={p.labelOffset} onChange={(e) => api.updateCustomProps(c.id, { labelOffset: Math.max(0, Number(e.target.value)) })} size="small" />
+        <TextField label="labelOffsetX" type="number" value={p.labelOffsetX} onChange={(e) => api.updateCustomProps(c.id, { labelOffsetX: clamp(Number(e.target.value), -200, 200) })} size="small" />
+        <TextField label="labelOffsetY" type="number" value={p.labelOffsetY} onChange={(e) => api.updateCustomProps(c.id, { labelOffsetY: clamp(Number(e.target.value), -200, 200) })} size="small" />
         <TextField label="labelDecimals" type="number" value={p.labelDecimals} onChange={(e) => api.updateCustomProps(c.id, { labelDecimals: clamp(Math.floor(Number(e.target.value)), 0, 10) })} size="small" />
       </div>
 
       <div className="grid grid-cols-2 gap-2 items-center">
         <FormControlLabel control={<Checkbox checked={p.showValueText} onChange={(e) => api.updateCustomProps(c.id, { showValueText: e.target.checked })} />} label="showValueText" />
         <TextField select label="valuePosition" value={p.valuePosition} onChange={(e) => api.updateCustomProps(c.id, { valuePosition: e.target.value })} size="small">
-          <MenuItem value="center">center</MenuItem>
-          <MenuItem value="end">end</MenuItem>
+          <MenuItem value="top-outside">top outside</MenuItem>
+          <MenuItem value="below-outside">below outside</MenuItem>
+          <MenuItem value="inside-center">inside center</MenuItem>
+          <MenuItem value="inside-top">inside top</MenuItem>
+          <MenuItem value="inside-bottom">inside bottom</MenuItem>
         </TextField>
         <ColorInput label="valueColor" id={`${c.id}-bar-valueColor`} value={p.valueColor} onChange={(v) => api.updateCustomProps(c.id, { valueColor: v })} />
         <TextField label="valueFontSize" type="number" value={p.valueFontSize} onChange={(e) => api.updateCustomProps(c.id, { valueFontSize: Math.max(6, Number(e.target.value)) })} size="small" />
         <TextField label="valueFontWeight" type="number" value={p.valueFontWeight} onChange={(e) => api.updateCustomProps(c.id, { valueFontWeight: clamp(Math.floor(Number(e.target.value)), 100, 900) })} size="small" />
+        <TextField label="valueOffsetX" type="number" value={p.valueOffsetX} onChange={(e) => api.updateCustomProps(c.id, { valueOffsetX: clamp(Number(e.target.value), -200, 200) })} size="small" />
+        <TextField label="valueOffsetY" type="number" value={p.valueOffsetY} onChange={(e) => api.updateCustomProps(c.id, { valueOffsetY: clamp(Number(e.target.value), -200, 200) })} size="small" />
         <TextField label="valueDecimals" type="number" value={p.valueDecimals} onChange={(e) => api.updateCustomProps(c.id, { valueDecimals: clamp(Math.floor(Number(e.target.value)), 0, 10) })} size="small" />
         <TextField label="valuePrefix" value={p.valuePrefix} onChange={(e) => api.updateCustomProps(c.id, { valuePrefix: e.target.value })} size="small" />
         <TextField label="valueSuffix" value={p.valueSuffix} onChange={(e) => api.updateCustomProps(c.id, { valueSuffix: e.target.value })} size="small" />

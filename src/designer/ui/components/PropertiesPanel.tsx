@@ -267,39 +267,7 @@ function ElementProperties({
     </>
   );
 
-  const maybeCustomProps =
-    el.type === "custom" ? (
-      (() => {
-        const c = el as CustomElement;
-        const customProps = c.props || {};
-        if (Object.keys(customProps).length === 0) return null;
-        return (
-          <>
-            <div className="col-span-2 font-medium mt-2">Custom Properties</div>
-            {Object.entries(customProps).map(([key, value]) => (
-              <Row
-                key={key}
-                id={`${baseId}-prop-${key}`}
-                label={key}
-                control={
-                  typeof value === "number"
-                    ? numberInput(`${baseId}-prop-${key}`, value, (v) => {
-                        const newProps = { ...customProps, [key]: v };
-                        engine.updateElement(el.id, { props: newProps });
-                      })
-                    : typeof value === "string"
-                      ? textInput(`${baseId}-prop-${key}`, value, (v) => {
-                          const newProps = { ...customProps, [key]: v };
-                          engine.updateElement(el.id, { props: newProps });
-                        })
-                      : (<span>{String(value)}</span>)
-                }
-              />
-            ))}
-          </>
-        );
-      })()
-    ) : null;
+  const maybeCustomProps = null;
 
   return (
     <div className="grid grid-cols-2 gap-2 items-center">

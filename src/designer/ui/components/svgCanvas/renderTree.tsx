@@ -1,4 +1,5 @@
 import type React from "react";
+import { memo } from "react";
 import { isValidElement } from "react";
 
 import type { DesignerAPI } from "../../../core/api";
@@ -67,7 +68,7 @@ export function RenderTree({
   );
 }
 
-function RenderElement({
+const RenderElement = memo(function RenderElement({
   el,
   doc,
   onRegister,
@@ -243,4 +244,4 @@ function RenderElement({
   }
 
   return null;
-}
+});

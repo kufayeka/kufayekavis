@@ -7,7 +7,7 @@ import { Button, Checkbox, FormControlLabel, MenuItem, TextField } from "@mui/ma
 
 import type { CustomElement } from "../../designer/core/types";
 import type { PropertiesSectionRenderCtx } from "../../designer/ui/components/properties/types";
-import { ColorInput } from "../../designer/ui/components/properties/controls";
+import { ColorInput, numberInput, Row, textInput } from "../../designer/ui/components/properties/controls";
 import { coerceGaugeProps } from "./gauge.model";
 
 function clamp(n: number, min: number, max: number): number {
@@ -68,60 +68,65 @@ function GaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React.Re
     <div className="rounded border border-black/10 p-2 space-y-3">
       <div className="text-sm font-medium">Gauge</div>
 
-      <div className="grid grid-cols-3 gap-2 items-center">
-        <TextField
+      <div className="grid grid-cols-3 gap-2 items-end">
+        <Row
+          id={`${c.id}-value`}
           label="value"
-          type="number"
-          value={p.value}
-          onChange={(e) => api.updateCustomProps(c.id, { value: Number(e.target.value) })}
-          size="small"
+          control={numberInput(`${c.id}-value`, p.value, (v) => api.updateCustomProps(c.id, { value: v }))}
         />
-        <TextField
+        <Row
+          id={`${c.id}-min`}
           label="min"
-          type="number"
-          value={p.min}
-          onChange={(e) => api.updateCustomProps(c.id, { min: Number(e.target.value) })}
-          size="small"
+          control={numberInput(`${c.id}-min`, p.min, (v) => api.updateCustomProps(c.id, { min: v }))}
         />
-        <TextField
+        <Row
+          id={`${c.id}-max`}
           label="max"
-          type="number"
-          value={p.max}
-          onChange={(e) => api.updateCustomProps(c.id, { max: Number(e.target.value) })}
-          size="small"
+          control={numberInput(`${c.id}-max`, p.max, (v) => api.updateCustomProps(c.id, { max: v }))}
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 items-center">
-        <TextField label="startAngle" type="number" value={p.startAngle} onChange={(e) => api.updateCustomProps(c.id, { startAngle: Number(e.target.value) })} size="small" />
-        <TextField label="endAngle" type="number" value={p.endAngle} onChange={(e) => api.updateCustomProps(c.id, { endAngle: Number(e.target.value) })} size="small" />
-        <TextField
+      <div className="grid grid-cols-2 gap-2 items-end">
+        <Row
+          id={`${c.id}-startAngle`}
+          label="startAngle"
+          control={numberInput(`${c.id}-startAngle`, p.startAngle, (v) => api.updateCustomProps(c.id, { startAngle: v }))}
+        />
+        <Row
+          id={`${c.id}-endAngle`}
+          label="endAngle"
+          control={numberInput(`${c.id}-endAngle`, p.endAngle, (v) => api.updateCustomProps(c.id, { endAngle: v }))}
+        />
+        <Row
+          id={`${c.id}-numTicks`}
           label="numTicks"
-          type="number"
-          value={p.numTicks}
-          onChange={(e) => api.updateCustomProps(c.id, { numTicks: clamp(Math.floor(Number(e.target.value)), 2, 50) })}
-          size="small"
+          control={numberInput(`${c.id}-numTicks`, p.numTicks, (v) => api.updateCustomProps(c.id, { numTicks: clamp(Math.floor(v), 2, 50) }))}
         />
-        <TextField label="diameter" type="number" value={p.diameter} onChange={(e) => api.updateCustomProps(c.id, { diameter: Math.max(20, Number(e.target.value)) })} size="small" />
+        <Row
+          id={`${c.id}-diameter`}
+          label="diameter"
+          control={numberInput(`${c.id}-diameter`, p.diameter, (v) => api.updateCustomProps(c.id, { diameter: Math.max(20, v) }))}
+        />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 items-center">
-        <TextField
-          select
-          label="fitMode"
-          value={p.fitMode}
-          onChange={(e) => api.updateCustomProps(c.id, { fitMode: e.target.value })}
-          size="small"
-        >
-          <MenuItem value="contain">contain</MenuItem>
-          <MenuItem value="stretch">stretch</MenuItem>
-        </TextField>
-        <TextField
+      <div className="grid grid-cols-2 gap-2 items-end">
+        <div>
+          <label className="text-xs text-gray-600">fitMode</label>
+          <TextField
+            select
+            fullWidth
+            value={p.fitMode}
+            onChange={(e) => api.updateCustomProps(c.id, { fitMode: e.target.value })}
+            size="small"
+          >
+            <MenuItem value="contain">contain</MenuItem>
+            <MenuItem value="stretch">stretch</MenuItem>
+          </TextField>
+        </div>
+        <Row
+          id={`${c.id}-padding`}
           label="padding"
-          type="number"
-          value={p.padding}
-          onChange={(e) => api.updateCustomProps(c.id, { padding: Math.max(0, Number(e.target.value)) })}
-          size="small"
+          control={numberInput(`${c.id}-padding`, p.padding, (v) => api.updateCustomProps(c.id, { padding: Math.max(0, v) }))}
         />
       </div>
 
@@ -149,26 +154,20 @@ function GaugeProperties({ ctx }: { ctx: PropertiesSectionRenderCtx }): React.Re
           <Button size="small" variant="outlined" onClick={applyZones}>
             Apply zones
           </Button>
-          <TextField
+          <Row
+            id={`${c.id}-zonesOpacity`}
             label="zonesOpacity"
-            type="number"
-            size="small"
-            value={p.zonesOpacity}
-            onChange={(e) => api.updateCustomProps(c.id, { zonesOpacity: clamp(Number(e.target.value), 0, 1) })}
+            control={numberInput(`${c.id}-zonesOpacity`, p.zonesOpacity, (v) => api.updateCustomProps(c.id, { zonesOpacity: clamp(v, 0, 1) }))}
           />
-          <TextField
+          <Row
+            id={`${c.id}-zoneArcWidth`}
             label="zoneArcWidth"
-            type="number"
-            size="small"
-            value={p.zoneArcWidth}
-            onChange={(e) => api.updateCustomProps(c.id, { zoneArcWidth: Math.max(1, Number(e.target.value)) })}
+            control={numberInput(`${c.id}-zoneArcWidth`, p.zoneArcWidth, (v) => api.updateCustomProps(c.id, { zoneArcWidth: Math.max(1, v) }))}
           />
-          <TextField
+          <Row
+            id={`${c.id}-zoneArcGap`}
             label="zoneArcGap"
-            type="number"
-            size="small"
-            value={p.zoneArcGap}
-            onChange={(e) => api.updateCustomProps(c.id, { zoneArcGap: Math.max(0, Number(e.target.value)) })}
+            control={numberInput(`${c.id}-zoneArcGap`, p.zoneArcGap, (v) => api.updateCustomProps(c.id, { zoneArcGap: Math.max(0, v) }))}
           />
         </div>
       </div>

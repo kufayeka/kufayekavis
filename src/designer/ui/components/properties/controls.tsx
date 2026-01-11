@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { HexColorPicker } from "react-colorful";
 import clsx from "clsx";
@@ -32,32 +32,177 @@ export function normalizeUrl(url: string): string {
    ========================= */
 
 export function numberInput(id: string, value: number, onChange: (v: number) => void) {
+  return <NumberInputField id={id} value={value} onChange={onChange} />;
+}
+
+export function textInput(id: string, value: string, onChange: (v: string) => void) {
+  return <TextInputField id={id} value={value} onChange={onChange} />;
+}
+
+export function textAreaInput(id: string, value: string, onChange: (v: string) => void) {
+  return <TextAreaInputField id={id} value={value} onChange={onChange} />;
+}
+
+function NumberInputField({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const lastValueRef = useRef(value);
+  const editingRef = useRef(false);
+  const [text, setText] = useState(() => String(Number.isFinite(value) ? value : 0));
+
+  useEffect(() => {
+    lastValueRef.current = value;
+    if (editingRef.current) return;
+    setText(String(Number.isFinite(value) ? value : 0));
+  }, [value]);
+
+  const commit = () => {
+    const n = Number(text);
+    if (Number.isFinite(n)) {
+      onChange(n);
+    } else {
+      setText(String(Number.isFinite(lastValueRef.current) ? lastValueRef.current : 0));
+    }
+  };
+
   return (
     <TextField
       id={id}
       fullWidth
       type="number"
-      value={Number.isFinite(value) ? value : 0}
-      onChange={(e) => onChange(Number(e.target.value))}
+      value={text}
+      onFocus={() => {
+        editingRef.current = true;
+      }}
+      onBlur={() => {
+        editingRef.current = false;
+        commit();
+      }}
+      onChange={(e) => {
+        setText(e.target.value);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          commit();
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+        if (e.key === "Escape") {
+          setText(String(Number.isFinite(lastValueRef.current) ? lastValueRef.current : 0));
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+      }}
     />
   );
 }
 
-export function textInput(id: string, value: string, onChange: (v: string) => void) {
+function TextInputField({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const lastValueRef = useRef(value);
+  const editingRef = useRef(false);
+  const [text, setText] = useState(() => String(value ?? ""));
+
+  useEffect(() => {
+    lastValueRef.current = value;
+    if (editingRef.current) return;
+    setText(String(value ?? ""));
+  }, [value]);
+
+  const commit = () => {
+    onChange(text);
+  };
+
   return (
-    <TextField id={id} fullWidth value={value} onChange={(e) => onChange(e.target.value)} />
+    <TextField
+      id={id}
+      fullWidth
+      value={text}
+      onFocus={() => {
+        editingRef.current = true;
+      }}
+      onBlur={() => {
+        editingRef.current = false;
+        commit();
+      }}
+      onChange={(e) => {
+        setText(e.target.value);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          commit();
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+        if (e.key === "Escape") {
+          setText(String(lastValueRef.current ?? ""));
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+      }}
+    />
   );
 }
 
-export function textAreaInput(id: string, value: string, onChange: (v: string) => void) {
+function TextAreaInputField({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const lastValueRef = useRef(value);
+  const editingRef = useRef(false);
+  const [text, setText] = useState(() => String(value ?? ""));
+
+  useEffect(() => {
+    lastValueRef.current = value;
+    if (editingRef.current) return;
+    setText(String(value ?? ""));
+  }, [value]);
+
+  const commit = () => {
+    onChange(text);
+  };
+
   return (
     <TextField
       id={id}
       fullWidth
       multiline
       minRows={3}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
+      value={text}
+      onFocus={() => {
+        editingRef.current = true;
+      }}
+      onBlur={() => {
+        editingRef.current = false;
+        commit();
+      }}
+      onChange={(e) => {
+        setText(e.target.value);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && e.ctrlKey) {
+          commit();
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+        if (e.key === "Escape") {
+          setText(String(lastValueRef.current ?? ""));
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+      }}
     />
   );
 }

@@ -8,13 +8,14 @@ import type { CustomElement } from "../../designer/core/types";
 import { coerceMotionPathLineProps } from "./motionPathLine.model";
 
 export function renderMotionPathLine(ctxUnknown: unknown): React.ReactNode {
-  const ctx = ctxUnknown as { element: CustomElement };
+  const ctx = ctxUnknown as { element: CustomElement; engine: any };
   const el = ctx.element;
-  return <MotionPathLineInner el={el} />;
+  const isOnline = ctx.engine?.getState?.()?.viewMode ?? false;
+  return <MotionPathLineInner el={el} isOnline={isOnline} />;
 }
 
-function MotionPathLineInner({ el }: { el: CustomElement }) {
-  const p = useMemo(() => coerceMotionPathLineProps(el.props), [el.props]);
+function MotionPathLineInner({ el, isOnline }: { el: CustomElement; isOnline: boolean }) {
+  const p = coerceMotionPathLineProps(el.props);
 
   const pathRef = useRef<SVGPathElement | null>(null);
   const particleRefs = useRef<Array<SVGElement | null>>([]);
@@ -77,12 +78,14 @@ function MotionPathLineInner({ el }: { el: CustomElement }) {
       node.setAttribute("transform", `translate(${pt.x} ${pt.y})`);
     };
 
-    // If animate disabled: place particles and stop.
-    if (!p.animate) {
-      nodes.forEach((node, i) => {
-        const offset = stepProgress > 0 ? i * stepProgress : 0;
-        setParticleAtProgress(node, offset);
-      });
+    // Always place particles initially
+    nodes.forEach((node, i) => {
+      const offset = stepProgress > 0 ? i * stepProgress : 0;
+      setParticleAtProgress(node, offset);
+    });
+
+    // If animate disabled and not online: stop here.
+    if (!p.animate && !isOnline) {
       return;
     }
 

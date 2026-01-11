@@ -93,6 +93,7 @@ export function Ribbon({ engine, state }: { engine: DesignerEngine; state: Desig
               -
             </Button>
             <TextField
+              id="zoom-textfield"
               inputMode="numeric"
               type="number"
               value={isZoomEditing ? zoomPercentText : String(derivedZoomPercent)}

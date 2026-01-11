@@ -161,11 +161,11 @@ export function DesignerApp({ projectId }: { projectId?: string }) {
         return;
       }
 
-      if (mod && e.key.toLowerCase() === "c") {
-        e.preventDefault();
-        engine.copySelection();
-        return;
-      }
+      // DISABLED: if (mod && e.key.toLowerCase() === "c") {
+      //   e.preventDefault();
+      //   engine.copySelection();
+      //   return;
+      // }
       // Let the app-level paste handler (in the canvas) handle Ctrl+V so
       // OS clipboard images take precedence over the internal clipboard.
       if (mod && e.key.toLowerCase() === "d") {
