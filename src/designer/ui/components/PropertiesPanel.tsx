@@ -6,6 +6,8 @@ import type { DesignerEngine, DesignerState } from "../../core/engine";
 import type { DesignerElement, CustomElement } from "../../core/types";
 import { useDesignerHost } from "../hooks/useDesignerHost";
 
+import type { PropertiesSectionRenderCtx } from "./properties/types";
+
 import { Button, ButtonGroup, Checkbox, FormControlLabel, TextField } from "@mui/material";
 
 import { ColorInput, numberInput, Row, textInput } from "./properties/controls";
@@ -40,6 +42,10 @@ export function PropertiesPanel({
       <div className="rounded border border-black/15 p-3 space-y-3">
         <div className="font-medium">Selection</div>
 
+        {state.viewMode && (
+          <div className="text-sm text-black/60">View Mode: properties are locked.</div>
+        )}
+
         {state.selection.ids.length === 0 && (
           <div className="text-sm text-black/60">No selection</div>
         )}
@@ -51,7 +57,9 @@ export function PropertiesPanel({
         )}
 
         {selected && (
-          <ElementProperties engine={engine} el={selected} />
+          <div className={state.viewMode ? "pointer-events-none opacity-70" : undefined}>
+            <ElementProperties engine={engine} el={selected} />
+          </div>
         )}
       </div>
 
@@ -59,7 +67,12 @@ export function PropertiesPanel({
         <div className="rounded border border-black/15 p-3 space-y-3 mt-4">
           <div className="font-medium">Plugins</div>
           {pluginSections.map((s) => (
-            <div key={s.id}>{s.render({ engine, state, api: host.api, host }) as React.ReactNode}</div>
+            <div key={s.id}>
+              {(() => {
+                const Section = s.render as unknown as React.ComponentType<PropertiesSectionRenderCtx>;
+                return <Section engine={engine} state={state} api={host.api} host={host} />;
+              })()}
+            </div>
           ))}
         </div>
       )}

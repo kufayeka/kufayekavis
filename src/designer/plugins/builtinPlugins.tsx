@@ -21,6 +21,8 @@ import { webEmbedElementDefinition } from "../../elements/webEmbed/webEmbed.defi
 import { renderWebEmbedProperties } from "../../elements/webEmbed/webEmbed.properties";
 import { motionPathLineElementDefinition } from "../../elements/motionPathLine/motionPathLine.definition";
 import { renderMotionPathLineProperties } from "../../elements/motionPathLine/motionPathLine.properties";
+import { gaugeElementDefinition } from "../../elements/gauge/gauge.definition";
+import { renderGaugeProperties } from "../../elements/gauge/gauge.properties";
 import { registerBuiltInUiContributions } from "../ui/components/builtins/registerBuiltInUi";
 
 export const builtInUiPlugin: DesignerPlugin = {
@@ -92,19 +94,6 @@ export const groupDefinitionPlugin: DesignerPlugin = {
     }),
 };
 
-export const customSvgElementPlugin: DesignerPlugin = {
-  id: "builtin.element.customSvg",
-  activate: (ctx) =>
-    ctx.elements.register({
-      id: "custom:customSvg",
-      type: "custom",
-      kind: "customSvg",
-      label: "Custom SVG",
-      palette: { label: "Custom SVG", order: 60 },
-      createInput: (pt) => ({ type: "custom", kind: "customSvg", x: pt.x, y: pt.y, width: 220, height: 160, props: {} }),
-    }),
-};
-
 export const builtInPalettePlugins: readonly DesignerPlugin[] = [
   rectElementPlugin,
   circleElementPlugin,
@@ -114,7 +103,6 @@ export const builtInPalettePlugins: readonly DesignerPlugin[] = [
   textElementPlugin,
   // Group isn't in the palette but is a native type.
   groupDefinitionPlugin,
-  customSvgElementPlugin,
 ];
 
 export const numericDisplayPlugin: DesignerPlugin = {
@@ -153,9 +141,22 @@ export const motionPathLinePlugin: DesignerPlugin = {
   },
 };
 
+export const gaugePlugin: DesignerPlugin = {
+  id: "builtin.element.gauge",
+  activate: (ctx) => {
+    const host = ctx.host;
+    if (!host) return;
+    return [
+      host.elements.register(gaugeElementDefinition),
+      host.registry.registerPropertiesSection({ id: "builtin.props.gauge", render: renderGaugeProperties }),
+    ];
+  },
+};
+
 export const builtInElementPlugins: readonly DesignerPlugin[] = [
   ...builtInPalettePlugins,
   numericDisplayPlugin,
   webEmbedPlugin,
   motionPathLinePlugin,
+  gaugePlugin,
 ];

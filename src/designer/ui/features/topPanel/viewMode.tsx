@@ -24,7 +24,7 @@ export function registerTopPanelViewModeToggle(opts: { host: DesignerHost }): Ar
         const { engine, state } = ctxUnknown as RibbonCtx;
         return (
           <Button onClick={() => engine.setViewMode(!state.viewMode)}>
-            {state.viewMode ? "Edit Mode" : "View Mode"}
+            {state.viewMode ? "View Mode" : "Edit Mode"}
           </Button>
         );
       },
