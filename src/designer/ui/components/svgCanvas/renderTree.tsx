@@ -12,6 +12,7 @@ export function RenderTree({
   renderCustom,
   renderNativeByDefinition,
   api,
+  runtimePatches,
 }: {
   doc: DesignerState["doc"];
   rootIds: ElementId[];
@@ -19,10 +20,26 @@ export function RenderTree({
   renderCustom: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
   renderNativeByDefinition?: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
   api: DesignerAPI;
+  runtimePatches?: Record<ElementId, Partial<DesignerElement>>;
 }) {
+  const applyRuntimePatch = (el: DesignerElement): DesignerElement => {
+    const patch = runtimePatches?.[el.id];
+    if (!patch) return el;
+    const merged = { ...el, ...patch } as DesignerElement;
+    if (el.type === "custom") {
+      const baseProps = (el.props ?? {}) as Record<string, unknown>;
+      const patchProps = (patch as unknown as { props?: unknown }).props;
+      if (patchProps && typeof patchProps === "object" && !Array.isArray(patchProps)) {
+        (merged as unknown as { props: Record<string, unknown> }).props = { ...baseProps, ...(patchProps as Record<string, unknown>) };
+      }
+    }
+    return merged;
+  };
+
   const sorted = [...rootIds]
     .map((id) => doc.elements[id])
     .filter(Boolean)
+    .map((el) => applyRuntimePatch(el as DesignerElement))
     .sort((a, b) => (a!.zIndex ?? 0) - (b!.zIndex ?? 0)) as DesignerElement[];
 
   const mqtt = api.getPluginSettings("system.mqttScada") as unknown;
@@ -43,6 +60,7 @@ export function RenderTree({
           renderNativeByDefinition={renderNativeByDefinition}
           api={api}
           forcePublishElementEvents={forcePublishElementEvents}
+          runtimePatches={runtimePatches}
         />
       ))}
     </>
@@ -57,6 +75,7 @@ function RenderElement({
   renderNativeByDefinition,
   api,
   forcePublishElementEvents,
+  runtimePatches,
 }: {
   el: DesignerElement;
   doc: DesignerState["doc"];
@@ -65,54 +84,72 @@ function RenderElement({
   renderNativeByDefinition?: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
   api: DesignerAPI;
   forcePublishElementEvents: boolean;
+  runtimePatches?: Record<ElementId, Partial<DesignerElement>>;
 }) {
   if (el.hidden) return null;
 
+  const applyRuntimePatch = (src: DesignerElement): DesignerElement => {
+    const patch = runtimePatches?.[src.id];
+    if (!patch) return src;
+    const merged = { ...src, ...patch } as DesignerElement;
+    if (src.type === "custom") {
+      const baseProps = (src.props ?? {}) as Record<string, unknown>;
+      const patchProps = (patch as unknown as { props?: unknown }).props;
+      if (patchProps && typeof patchProps === "object" && !Array.isArray(patchProps)) {
+        (merged as unknown as { props: Record<string, unknown> }).props = { ...baseProps, ...(patchProps as Record<string, unknown>) };
+      }
+    }
+    return merged;
+  };
+
+  const elPatched = applyRuntimePatch(el);
+
   const getTransform = (cx: number, cy: number) => {
     const parts: string[] = [];
-    const meta = el as unknown as { flipH?: boolean; flipV?: boolean };
+    const meta = elPatched as unknown as { flipH?: boolean; flipV?: boolean };
     if (meta.flipH || meta.flipV) {
       const sx = meta.flipH ? -1 : 1;
       const sy = meta.flipV ? -1 : 1;
       parts.push(`translate(${cx} ${cy}) scale(${sx} ${sy}) translate(${-cx} ${-cy})`);
     }
-    if (el.rotation) parts.push(`rotate(${el.rotation} ${cx} ${cy})`);
+    if (elPatched.rotation) parts.push(`rotate(${elPatched.rotation} ${cx} ${cy})`);
     return parts.length ? parts.join(" ") : undefined;
   };
 
   const getTransformForElement = (): string | undefined => {
-    if (el.type === "rect" || el.type === "image" || el.type === "custom") {
-      const cx = el.x + el.width / 2;
-      const cy = el.y + el.height / 2;
+    if (elPatched.type === "rect" || elPatched.type === "image" || elPatched.type === "custom") {
+      const cx = elPatched.x + elPatched.width / 2;
+      const cy = elPatched.y + elPatched.height / 2;
       return getTransform(cx, cy);
     }
 
-    if (el.type === "circle") {
-      return getTransform(el.cx, el.cy);
+    if (elPatched.type === "circle") {
+      return getTransform(elPatched.cx, elPatched.cy);
     }
 
-    if (el.type === "line") {
-      const cx = (el.x1 + el.x2) / 2;
-      const cy = (el.y1 + el.y2) / 2;
+    if (elPatched.type === "line") {
+      const cx = (elPatched.x1 + elPatched.x2) / 2;
+      const cy = (elPatched.y1 + elPatched.y2) / 2;
       return getTransform(cx, cy);
     }
 
-    if (el.type === "text") {
-      return getTransform(el.x, el.y);
+    if (elPatched.type === "text") {
+      return getTransform(elPatched.x, elPatched.y);
     }
 
     // free + group: no transform center defined here
     return undefined;
   };
 
-  if (el.type === "group") {
-    const children = el.childIds
+  if (elPatched.type === "group") {
+    const children = elPatched.childIds
       .map((id) => doc.elements[id])
       .filter(Boolean)
+      .map((child) => applyRuntimePatch(child as DesignerElement))
       .sort((a, b) => (a!.zIndex ?? 0) - (b!.zIndex ?? 0)) as DesignerElement[];
 
     return (
-      <g ref={(node) => onRegister(el.id, node)} data-el-id={el.id}>
+      <g ref={(node) => onRegister(elPatched.id, node)} data-el-id={elPatched.id}>
         {children.map((child) => (
           <RenderElement
             key={child.id}
@@ -122,35 +159,36 @@ function RenderElement({
             renderCustom={renderCustom}
             api={api}
             forcePublishElementEvents={forcePublishElementEvents}
+            runtimePatches={runtimePatches}
           />
         ))}
       </g>
     );
   }
 
-  if (el.type !== "custom" && renderNativeByDefinition) {
-    const rendered = renderNativeByDefinition(el, doc);
+  if (elPatched.type !== "custom" && renderNativeByDefinition) {
+    const rendered = renderNativeByDefinition(elPatched, doc);
     if (isValidElement(rendered)) {
       return (
         <g
-          ref={(node) => onRegister(el.id, node)}
-          data-el-id={el.id}
-          opacity={el.opacity}
+          ref={(node) => onRegister(elPatched.id, node)}
+          data-el-id={elPatched.id}
+          opacity={elPatched.opacity}
           transform={getTransformForElement()}
           className="cursor-move"
           onMouseEnter={
-            forcePublishElementEvents || el.enableOnMouseHoverEventListener
-              ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
+            forcePublishElementEvents || elPatched.enableOnMouseHoverEventListener
+              ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: elPatched.id })
               : undefined
           }
           onClick={
-            forcePublishElementEvents || el.enableOnMouseClickEventListener
-              ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
+            forcePublishElementEvents || elPatched.enableOnMouseClickEventListener
+              ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onClick", sourceElement: elPatched.id })
               : undefined
           }
           onMouseLeave={
-            forcePublishElementEvents || el.enableOnMouseLeaveEventListener
-              ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
+            forcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener
+              ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: elPatched.id })
               : undefined
           }
         >
@@ -160,41 +198,41 @@ function RenderElement({
     }
   }
 
-  if (el.type === "custom") {
-    const cx = el.x + el.width / 2;
-    const cy = el.y + el.height / 2;
+  if (elPatched.type === "custom") {
+    const cx = elPatched.x + elPatched.width / 2;
+    const cy = elPatched.y + elPatched.height / 2;
     const transform = getTransform(cx, cy);
-    const content = renderCustom(el, doc);
+    const content = renderCustom(elPatched, doc);
 
     return (
       <g
-        ref={(node) => onRegister(el.id, node)}
-        data-el-id={el.id}
-        opacity={el.opacity}
+        ref={(node) => onRegister(elPatched.id, node)}
+        data-el-id={elPatched.id}
+        opacity={elPatched.opacity}
         transform={transform}
         className="cursor-move"
         onMouseEnter={
-          forcePublishElementEvents || el.enableOnMouseHoverEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: el.id })
+          forcePublishElementEvents || elPatched.enableOnMouseHoverEventListener
+            ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: elPatched.id })
             : undefined
         }
         onClick={
-          forcePublishElementEvents || el.enableOnMouseClickEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onClick", sourceElement: el.id })
+          forcePublishElementEvents || elPatched.enableOnMouseClickEventListener
+            ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onClick", sourceElement: elPatched.id })
             : undefined
         }
         onMouseLeave={
-          forcePublishElementEvents || el.enableOnMouseLeaveEventListener
-            ? () => api.publishEvent(el.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: el.id })
+          forcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener
+            ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: elPatched.id })
             : undefined
         }
       >
         <svg
-          x={el.x}
-          y={el.y}
-          width={el.width}
-          height={el.height}
-          viewBox={`0 0 ${Math.max(1, el.width)} ${Math.max(1, el.height)}`}
+          x={elPatched.x}
+          y={elPatched.y}
+          width={elPatched.width}
+          height={elPatched.height}
+          viewBox={`0 0 ${Math.max(1, elPatched.width)} ${Math.max(1, elPatched.height)}`}
           preserveAspectRatio="none"
           overflow="visible"
         >

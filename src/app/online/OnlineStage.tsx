@@ -10,6 +10,7 @@ import { RenderTree } from "../../designer/ui/components/svgCanvas/renderTree";
 
 export function OnlineStage({ engine, state }: { engine: DesignerEngine; state: DesignerState }) {
   const host = useDesignerHost();
+  const runtimePatches = state.runtime?.elementPatches;
 
   const renderCustom = useCallback(
     (el: DesignerElement, doc: DesignerState["doc"]) => {
@@ -83,6 +84,7 @@ export function OnlineStage({ engine, state }: { engine: DesignerEngine; state: 
             renderCustom={renderCustom}
             renderNativeByDefinition={renderNativeByDefinition}
             api={host.api}
+            runtimePatches={runtimePatches}
           />
         </g>
       </svg>

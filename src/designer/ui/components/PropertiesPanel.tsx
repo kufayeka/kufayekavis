@@ -97,6 +97,28 @@ function ElementProperties({
           </div>
         }
       />
+
+        <Row
+          id={`${baseId}-tag`}
+          label="Tag"
+          control={
+            <div className="flex items-center gap-2">
+              <TextField
+                id={`${baseId}-tag`}
+                fullWidth
+                value={el.tag ?? ""}
+                onChange={(e) => engine.updateElement(el.id, { tag: e.target.value })}
+              />
+              <Button
+                onClick={() => navigator.clipboard?.writeText(String(el.tag ?? ""))}
+                aria-label="Copy element tag"
+                disabled={!String(el.tag ?? "").trim()}
+              >
+                Copy
+              </Button>
+            </div>
+          }
+        />
       
         <div className="font-medium mt-2">Transform</div>
         <div className="flex items-center gap-2 mt-2 flex-wrap">

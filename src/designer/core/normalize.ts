@@ -40,6 +40,7 @@ function baseElementSchema(defaults?: { stroke?: string; strokeWidth?: number; f
     .object({
       id: z.preprocess((v) => (typeof v === "string" ? v : undefined), z.string().default("")),
       name: z.preprocess((v) => (typeof v === "string" ? v : undefined), z.string().optional()),
+      tag: z.preprocess((v) => (typeof v === "string" ? v : undefined), z.string().optional()),
       locked: zBoolOptional(),
       hidden: zBoolOptional(),
       parentId: z.preprocess((v) => (typeof v === "string" ? v : undefined), z.string().optional()),

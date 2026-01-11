@@ -15,6 +15,9 @@ export type BaseElement = {
   id: ElementId;
   type: DesignerElementType;
   name?: string;
+  // Optional runtime addressing tag (e.g. "screen1/agitator1").
+  // Used for remote updates without relying on element ids.
+  tag?: string;
   locked?: boolean;
   hidden?: boolean;
   parentId?: ElementId; // group id

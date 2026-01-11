@@ -934,6 +934,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
               renderCustom={renderCustom}
               renderNativeByDefinition={renderNativeByDefinition}
               api={host.api}
+              runtimePatches={state.viewMode ? state.runtime?.elementPatches : undefined}
             />
 
             {dragUi.kind === "free" && dragUi.points.length > 1 && (

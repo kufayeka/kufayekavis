@@ -10,7 +10,7 @@ import { Alert, Button, Checkbox, FormControlLabel, TextField } from "@mui/mater
 import type { DesignerPlugin } from "../core/plugins";
 import type { DesignerAPI } from "../core/api";
 import type { CreateElementInput } from "../core/engine";
-import type { DesignerElement } from "../core/types";
+import type { DesignerElement, ElementId } from "../core/types";
 import type { DesignerRegistry, UiLayoutState } from "../core/registry";
 
 type MqttScadaSettings = {
@@ -140,6 +140,37 @@ function applyRemoteControlCommand(
     } finally {
       api.engine.endHistoryBatch();
     }
+  };
+
+  const applyRuntimeSmartPatch = (ids: string[], patch: Record<string, unknown>) => {
+    if (!ids.length) return;
+    const doc = api.getDocument();
+    const customIds: string[] = [];
+    const normalIds: string[] = [];
+
+    for (const id of ids) {
+      const el = doc.elements[id];
+      if (el && (el as DesignerElement).type === "custom") customIds.push(id);
+      else normalIds.push(id);
+    }
+
+    if (normalIds.length) {
+      api.engine.patchRuntimeElements(normalIds as ElementId[], patch as Partial<DesignerElement>);
+    }
+
+    if (customIds.length) {
+      const { elementPatch, propsPatch } = splitCustomElementPatch(patch);
+      const runtimePatch: Record<string, unknown> = { ...elementPatch };
+      if (Object.keys(propsPatch).length > 0) runtimePatch.props = propsPatch;
+      api.engine.patchRuntimeElements(customIds as ElementId[], runtimePatch as Partial<DesignerElement>);
+    }
+  };
+
+  const resolveTargetIds = (target: { id?: string; tag?: string }): string[] => {
+    const tag = target.tag?.trim();
+    if (tag) return api.engine.findElementIdsByTag(tag);
+    const id = target.id?.trim();
+    return id ? [id] : [];
   };
 
   const envelopeSchema = z.object({
@@ -335,9 +366,27 @@ function applyRemoteControlCommand(
       respond({ type: "createElement", ok: true, id });
     })
     .with("updateElement", () => {
-      const parsed = z.object({ id: z.string().min(1), patch: z.record(z.string(), z.unknown()) }).safeParse(payload);
+      const parsed = z
+        .object({
+          id: z.string().optional(),
+          tag: z.string().optional(),
+          patch: z.record(z.string(), z.unknown()),
+        })
+        .safeParse(payload);
       if (!parsed.success) return;
-      applySmartPatch(parsed.data.id, parsed.data.patch);
+
+      const ids = resolveTargetIds(parsed.data);
+      if (!ids.length) {
+        respond({ type: "updateElement", ok: false, error: "Target element not found (id/tag)" });
+        return;
+      }
+
+      if (api.engine.getState().viewMode) {
+        applyRuntimeSmartPatch(ids, parsed.data.patch);
+      } else {
+        // Edit Mode (normally blocked earlier): fall back to persistent update.
+        for (const id of ids) applySmartPatch(id, parsed.data.patch);
+      }
     })
     .with("bulkUpdateElements", () => {
       const parsed = z
@@ -349,6 +398,14 @@ function applyRemoteControlCommand(
         .safeParse(payload);
       if (!parsed.success) return;
       if (parsed.data.updates.length === 0) return;
+
+      if (api.engine.getState().viewMode) {
+        for (const u of parsed.data.updates) {
+          applyRuntimeSmartPatch([u.id], u.patch);
+        }
+        return;
+      }
+
       api.engine.beginHistoryBatch();
       try {
         for (const u of parsed.data.updates) {
@@ -361,6 +418,10 @@ function applyRemoteControlCommand(
     .with("updateCustomProps", () => {
       const parsed = z.object({ id: z.string().min(1), patch: z.record(z.string(), z.unknown()) }).safeParse(payload);
       if (!parsed.success) return;
+      if (api.engine.getState().viewMode) {
+        applyRuntimeSmartPatch([parsed.data.id], { props: parsed.data.patch });
+        return;
+      }
       api.updateCustomProps(parsed.data.id, parsed.data.patch);
     })
     .with("callElementAction", () => {

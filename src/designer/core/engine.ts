@@ -39,6 +39,10 @@ export type DesignerState = {
   tool: ToolType;
   clipboard: ClipboardPayload | null;
   viewMode?: boolean;
+  // Runtime-only overlays (not exported/persisted). Used for online/view mode updates.
+  runtime?: {
+    elementPatches: Record<ElementId, Partial<DesignerElement>>;
+  };
 };
 
 type EngineEvent = "change";
@@ -68,6 +72,10 @@ export class DesignerEngine {
   private emitter = new Emitter<EngineEvent>();
   private state: DesignerState;
 
+  private docRevision = 0;
+  private tagIndexRevision = -1;
+  private tagToIds = new Map<string, ElementId[]>();
+
   private historyBatchDepth = 0;
   private pendingHistoryBaseDoc: DesignerDocument | null = null;
   private pendingHistoryBaseSnapJson: string | null = null;
@@ -92,6 +100,7 @@ export class DesignerEngine {
       tool: initial?.tool ?? "select",
       clipboard: initial?.clipboard ?? null,
       viewMode: initial?.viewMode ?? false,
+      runtime: initial?.runtime ?? { elementPatches: {} },
     };
   }
 
@@ -121,7 +130,75 @@ export class DesignerEngine {
   ) {
     const nextDoc = ensureHistory(nextDocRaw);
     const nextProject = this.syncActiveCanvasDoc(this.state.project, nextDoc);
+    this.docRevision += 1;
     this.setState({ ...this.state, ...patch, doc: nextDoc, project: nextProject });
+  }
+
+  private ensureTagIndex(): void {
+    if (this.tagIndexRevision === this.docRevision) return;
+    this.tagToIds.clear();
+    for (const [id, el] of Object.entries(this.state.doc.elements)) {
+      const tag = (el as unknown as { tag?: unknown }).tag;
+      if (typeof tag !== "string") continue;
+      const t = tag.trim();
+      if (!t) continue;
+      const arr = this.tagToIds.get(t);
+      if (arr) arr.push(id);
+      else this.tagToIds.set(t, [id]);
+    }
+    this.tagIndexRevision = this.docRevision;
+  }
+
+  findElementIdsByTag(tag: string): ElementId[] {
+    const t = (tag ?? "").trim();
+    if (!t) return [];
+    this.ensureTagIndex();
+    return this.tagToIds.get(t)?.slice() ?? [];
+  }
+
+  getRuntimeElementPatch(id: ElementId): Partial<DesignerElement> | undefined {
+    return this.state.runtime?.elementPatches?.[id];
+  }
+
+  clearRuntimePatches(): void {
+    const nextRuntime = { elementPatches: {} as Record<ElementId, Partial<DesignerElement>> };
+    this.setState({ ...this.state, runtime: nextRuntime });
+  }
+
+  patchRuntimeElements(ids: ElementId[], patch: Partial<DesignerElement>): void {
+    if (!ids || ids.length === 0) return;
+    const cur = this.state.runtime?.elementPatches ?? {};
+    let changed = false;
+    const next: Record<ElementId, Partial<DesignerElement>> = { ...cur };
+
+    for (const id of ids) {
+      const existing = next[id] ?? {};
+      const nextProps =
+        patch && typeof (patch as unknown as { props?: unknown }).props === "object" && (patch as unknown as { props?: unknown }).props &&
+        !Array.isArray((patch as unknown as { props?: unknown }).props)
+          ? {
+              ...(existing as unknown as { props?: Record<string, unknown> }).props,
+              ...((patch as unknown as { props?: Record<string, unknown> }).props ?? {}),
+            }
+          : (existing as unknown as { props?: Record<string, unknown> }).props;
+
+      const merged: Partial<DesignerElement> = {
+        ...existing,
+        ...patch,
+        ...(nextProps ? { props: nextProps } : null),
+      };
+
+      // Avoid needless state churn if nothing changes.
+      const beforeJson = JSON.stringify(existing);
+      const afterJson = JSON.stringify(merged);
+      if (beforeJson !== afterJson) {
+        next[id] = merged;
+        changed = true;
+      }
+    }
+
+    if (!changed) return;
+    this.setState({ ...this.state, runtime: { elementPatches: next } });
   }
 
   private setState(next: DesignerState): void {
