@@ -175,8 +175,12 @@ export type DesignerProject = {
   version: 1;
   id: ProjectId;
   name?: string;
+  // Project-wide plugin settings. This is the canonical storage for multi-canvas projects.
+  // (Older exports may still contain per-canvas `doc.pluginSettings`; those should be migrated on import.)
+  pluginSettings?: PluginSettingsMap;
   canvases: DesignerCanvas[];
   activeCanvasId: CanvasId;
+  defaultCanvasId?: CanvasId;
 };
 
 export type PluginSettingsMap = Record<string, unknown>;
@@ -194,7 +198,8 @@ export type DesignerDocument = {
   rootIds: ElementId[];
   nextZ: number;
 
-  // Optional plugin settings. Stored in project JSON but excluded from undo/redo history.
+  // Legacy: per-canvas plugin settings (kept for backward compatibility).
+  // New projects should store settings in `DesignerProject.pluginSettings`.
   pluginSettings?: PluginSettingsMap;
 
   // Optional to keep backward compatibility with older exported JSON.

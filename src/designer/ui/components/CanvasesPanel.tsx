@@ -21,6 +21,8 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FileCopyIcon from "@mui/icons-material/FileCopy";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
 import type { DesignerEngine, DesignerState } from "../../core/engine";
 import { ColorInput, numberInput, Row } from "./properties/controls";
 
@@ -28,6 +30,7 @@ export function CanvasesPanel({ engine, state }: { engine: DesignerEngine; state
   const project = state.project;
   const canvases = project.canvases;
   const activeId = project.activeCanvasId;
+  const defaultCanvasId = project.defaultCanvasId;
   const isViewMode = state.viewMode;
 
   const activeCanvas = useMemo(() => canvases.find((c) => c.id === activeId) ?? canvases[0], [activeId, canvases]);
@@ -91,6 +94,7 @@ export function CanvasesPanel({ engine, state }: { engine: DesignerEngine; state
         {canvases.map((c) => (
           <ListItem key={c.id} disablePadding>
             <ListItemButton selected={c.id === activeId} onClick={() => engine.setActiveCanvas(c.id)}>
+              {c.id === defaultCanvasId && <StarIcon sx={{ mr: 1, color: "gold" }} />}
               <ListItemText
                 primary={c.name}
                 secondary={c.id}
@@ -98,6 +102,16 @@ export function CanvasesPanel({ engine, state }: { engine: DesignerEngine; state
                 secondaryTypographyProps={{ sx: { fontFamily: "monospace" } }}
               />
             </ListItemButton>
+            {!isViewMode && (
+              <IconButton
+                size="small"
+                onClick={() => engine.setDefaultCanvas(c.id)}
+                disabled={c.id === defaultCanvasId}
+                title="Set as first canvas"
+              >
+                {c.id === defaultCanvasId ? <StarIcon /> : <StarBorderIcon />}
+              </IconButton>
+            )}
           </ListItem>
         ))}
       </List>

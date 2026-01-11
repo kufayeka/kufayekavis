@@ -306,17 +306,20 @@ export class DesignerEngine {
   }
 
   getPluginSettings(pluginId: string): unknown {
-    const map = (this.state.doc as unknown as { pluginSettings?: Record<string, unknown> }).pluginSettings ?? {};
+    const map = (this.state.project as unknown as { pluginSettings?: Record<string, unknown> }).pluginSettings ?? {};
     return map[pluginId];
   }
 
   setPluginSettings(pluginId: string, value: unknown): void {
-    const cur = (this.state.doc as unknown as { pluginSettings?: Record<string, unknown> }).pluginSettings ?? {};
+    const cur = (this.state.project as unknown as { pluginSettings?: Record<string, unknown> }).pluginSettings ?? {};
     const nextSettings = { ...cur, [pluginId]: value };
-    // Plugin settings should not affect undo/redo history; update doc directly.
-    this.setDoc({
-      ...this.state.doc,
-      pluginSettings: nextSettings,
+    // Plugin settings should not affect undo/redo history; keep them at project-level.
+    this.setState({
+      ...this.state,
+      project: {
+        ...this.state.project,
+        pluginSettings: nextSettings,
+      },
     });
   }
 
@@ -337,6 +340,17 @@ export class DesignerEngine {
       selection: { ids: [] },
       zoom: { scale: 1, panX: 0, panY: 0 },
       tool: "select",
+    });
+  }
+
+  setDefaultCanvas(canvasId: string): void {
+    const p = this.state.project;
+    const target = p.canvases.find((c) => c.id === canvasId);
+    if (!target) return;
+
+    this.setState({
+      ...this.state,
+      project: { ...p, defaultCanvasId: target.id },
     });
   }
 
@@ -729,9 +743,12 @@ export class DesignerEngine {
   }
 
   copySelection() {
-    const ids = this.state.selection.ids;
+    const selectionIds = this.state.selection.ids;
 
     const doc = this.state.doc;
+
+    // UX: if nothing is selected, treat Copy as "copy all" for the current canvas.
+    const ids = selectionIds.length > 0 ? selectionIds : [...doc.rootIds];
     const selected = new Set(ids);
 
     const isDescendantOfSelected = (id: ElementId): boolean => {
@@ -743,7 +760,7 @@ export class DesignerEngine {
       return false;
     };
 
-    const roots = ids.filter((id) => !isDescendantOfSelected(id));
+    const roots = selectionIds.length > 0 ? ids.filter((id) => !isDescendantOfSelected(id)) : ids;
     if (roots.length === 0) return;
 
     const allIds = new Set<ElementId>();

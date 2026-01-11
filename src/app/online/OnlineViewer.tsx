@@ -47,8 +47,10 @@ export function OnlineViewer({ projectId, canvasId }: { projectId: string; canva
         const jsonText = await fetchOnlineProjectJsonText(projectId);
         if (!alive) return;
         engine.importProjectJson(jsonText);
-        if (canvasId) {
-          engine.setActiveCanvas(canvasId);
+        const project = engine.getState().project;
+        const targetCanvasId = canvasId || project.defaultCanvasId || project.canvases[0]?.id;
+        if (targetCanvasId) {
+          engine.setActiveCanvas(targetCanvasId);
         }
         engine.setViewMode(true);
         engine.clearSelection();

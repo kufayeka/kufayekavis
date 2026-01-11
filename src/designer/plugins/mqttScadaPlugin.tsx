@@ -144,6 +144,17 @@ function applyRemoteControlCommand(
 
   const applyRuntimeSmartPatch = (ids: string[], patch: Record<string, unknown>) => {
     if (!ids.length) return;
+
+    // For remote control in view mode, we want to apply patches globally across all canvases
+    // Check if we're in view mode and apply global patches
+    if (api.engine.getState().viewMode) {
+      for (const id of ids) {
+        applyGlobalRuntimePatch(id, patch);
+      }
+      return;
+    }
+
+    // Fallback to active canvas only for edit mode
     const doc = api.getDocument();
     const customIds: string[] = [];
     const normalIds: string[] = [];
@@ -166,9 +177,47 @@ function applyRemoteControlCommand(
     }
   };
 
+  const findElementInAllCanvases = (id: string) => {
+    const project = api.engine.getState().project;
+    for (const canvas of project.canvases) {
+      const el = canvas.doc.elements[id];
+      if (el) return { element: el, canvasId: canvas.id };
+    }
+    return null;
+  };
+
+  const applyGlobalRuntimePatch = (id: string, patch: Record<string, unknown>) => {
+    const found = findElementInAllCanvases(id);
+    if (!found) return;
+
+    const { element } = found;
+    if (element.type !== "custom") {
+      // For non-custom elements, apply runtime patch directly
+      api.engine.patchRuntimeElements([id], patch as Partial<DesignerElement>);
+      return;
+    }
+
+    const { elementPatch, propsPatch } = splitCustomElementPatch(patch);
+    const runtimePatch: Record<string, unknown> = { ...elementPatch };
+    if (Object.keys(propsPatch).length > 0) runtimePatch.props = propsPatch;
+    api.engine.patchRuntimeElements([id], runtimePatch as Partial<DesignerElement>);
+  };
+
   const resolveTargetIds = (target: { id?: string; tag?: string }): string[] => {
     const tag = target.tag?.trim();
-    if (tag) return api.engine.findElementIdsByTag(tag);
+    if (tag) {
+      const project = api.engine.getState().project;
+      const ids: string[] = [];
+      for (const canvas of project.canvases) {
+        for (const [id, el] of Object.entries(canvas.doc.elements)) {
+          const elTag = (el as unknown as { tag?: unknown }).tag;
+          if (typeof elTag === "string" && elTag.trim() === tag) {
+            ids.push(id);
+          }
+        }
+      }
+      return ids;
+    }
     const id = target.id?.trim();
     return id ? [id] : [];
   };
