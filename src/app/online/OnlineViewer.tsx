@@ -4,11 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { createDesignerHost } from "../../designer/core/host";
 import { useDesignerEngine } from "../../designer/ui/hooks/useDesignerEngine";
 import { DesignerHostProvider } from "../../designer/ui/hooks/useDesignerHost";
-import { SvgCanvas } from "../../designer/ui/components/SvgCanvas";
-import { DialogHost } from "../../designer/ui/components/DialogHost";
-import { PopupHost } from "../../designer/ui/components/PopupHost";
 import { builtInElementPlugins } from "../../designer/plugins/builtinPlugins";
 import { mqttScadaPlugin } from "../../designer/plugins/mqttScadaPlugin";
+import { OnlineStage } from "./OnlineStage";
 
 async function fetchOnlineProjectJsonText(id: string): Promise<string> {
   const res = await fetch(`/api/onlineProjects/${encodeURIComponent(id)}`, { cache: "no-store" });
@@ -82,9 +80,7 @@ export function OnlineViewer({ projectId, canvasId }: { projectId: string; canva
             <div className="text-black/70">{status.message}</div>
           </div>
         )}
-        <SvgCanvas engine={engine} state={state} />
-        <DialogHost engine={engine} state={state} />
-        <PopupHost engine={engine} state={state} />
+        <OnlineStage engine={engine} state={state} />
       </div>
     </DesignerHostProvider>
   );

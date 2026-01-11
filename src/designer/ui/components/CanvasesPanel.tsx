@@ -28,6 +28,7 @@ export function CanvasesPanel({ engine, state }: { engine: DesignerEngine; state
   const project = state.project;
   const canvases = project.canvases;
   const activeId = project.activeCanvasId;
+  const isViewMode = state.viewMode;
 
   const activeCanvas = useMemo(() => canvases.find((c) => c.id === activeId) ?? canvases[0], [activeId, canvases]);
 
@@ -69,13 +70,13 @@ export function CanvasesPanel({ engine, state }: { engine: DesignerEngine; state
     <Box sx={{ p: 1.5 }}>
       <Stack direction="row" spacing={1} sx={{ mb: 1 }} alignItems="center">
         <ButtonGroup size="small" variant="outlined">
-          <Button startIcon={<AddIcon />} onClick={onAdd}>
+          <Button startIcon={<AddIcon />} onClick={onAdd} disabled={isViewMode}>
             Add
           </Button>
-          <Button startIcon={<FileCopyIcon />} onClick={onDuplicate} disabled={!activeCanvas}>
+          <Button startIcon={<FileCopyIcon />} onClick={onDuplicate} disabled={isViewMode || !activeCanvas}>
             Duplicate
           </Button>
-          <Button startIcon={<DeleteIcon />} onClick={onDelete} disabled={!activeCanvas || !canDelete}>
+          <Button startIcon={<DeleteIcon />} onClick={onDelete} disabled={isViewMode || !activeCanvas || !canDelete}>
             Delete
           </Button>
         </ButtonGroup>
@@ -133,66 +134,77 @@ export function CanvasesPanel({ engine, state }: { engine: DesignerEngine; state
                 (e.target as HTMLInputElement).blur();
               }
             }}
+            disabled={isViewMode}
             fullWidth
           />
 
           <Divider />
 
-          <Box className="grid grid-cols-2 gap-2 items-center">
-            <Row
-              id="canvas-width"
-              label="Width"
-              control={numberInput("canvas-width", state.doc.canvas.width, (v) => engine.setCanvas({ width: Math.max(1, v) }))}
-            />
+          {!isViewMode ? (
+            <Box className="grid grid-cols-2 gap-2 items-center">
+              <Row
+                id="canvas-width"
+                label="Width"
+                control={numberInput("canvas-width", state.doc.canvas.width, (v) => engine.setCanvas({ width: Math.max(1, v) }))}
+              />
 
-            <Row
-              id="canvas-height"
-              label="Height"
-              control={numberInput("canvas-height", state.doc.canvas.height, (v) => engine.setCanvas({ height: Math.max(1, v) }))}
-            />
+              <Row
+                id="canvas-height"
+                label="Height"
+                control={numberInput("canvas-height", state.doc.canvas.height, (v) => engine.setCanvas({ height: Math.max(1, v) }))}
+              />
 
-            <Row
-              id="canvas-bg"
-              label="Background"
-              control={
-                <ColorInput
-                  id="canvas-bg"
-                  value={state.doc.canvas.background}
-                  onChange={(v) => engine.setCanvas({ background: v })}
-                />
-              }
-            />
+              <Row
+                id="canvas-bg"
+                label="Background"
+                control={
+                  <ColorInput
+                    id="canvas-bg"
+                    value={state.doc.canvas.background}
+                    onChange={(v) => engine.setCanvas({ background: v })}
+                  />
+                }
+              />
 
-            <Row
-              id="canvas-grid"
-              label="Grid"
-              control={
-                <Checkbox
-                  id="canvas-grid"
-                  checked={state.doc.canvas.gridEnabled}
-                  onChange={(e) => engine.setCanvas({ gridEnabled: e.target.checked })}
-                />
-              }
-            />
+              <Row
+                id="canvas-grid"
+                label="Grid"
+                control={
+                  <Checkbox
+                    id="canvas-grid"
+                    checked={state.doc.canvas.gridEnabled}
+                    onChange={(e) => engine.setCanvas({ gridEnabled: e.target.checked })}
+                  />
+                }
+              />
 
-            <Row
-              id="canvas-snap"
-              label="Snap to Grid"
-              control={
-                <Checkbox
-                  id="canvas-snap"
-                  checked={state.doc.canvas.snapToGrid}
-                  onChange={(e) => engine.setCanvas({ snapToGrid: e.target.checked })}
-                />
-              }
-            />
+              <Row
+                id="canvas-snap"
+                label="Snap to Grid"
+                control={
+                  <Checkbox
+                    id="canvas-snap"
+                    checked={state.doc.canvas.snapToGrid}
+                    onChange={(e) => engine.setCanvas({ snapToGrid: e.target.checked })}
+                  />
+                }
+              />
 
-            <Row
-              id="canvas-grid-size"
-              label="Grid Size"
-              control={numberInput("canvas-grid-size", state.doc.canvas.gridSize, (v) => engine.setCanvas({ gridSize: Math.max(1, v) }))}
-            />
-          </Box>
+              <Row
+                id="canvas-grid-size"
+                label="Grid Size"
+                control={numberInput(
+                  "canvas-grid-size",
+                  state.doc.canvas.gridSize,
+                  (v) => engine.setCanvas({ gridSize: Math.max(1, v) }),
+                )}
+              />
+            </Box>
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              View Mode: canvas settings are locked.
+            </Typography>
+          )}
         </Stack>
       )}
     </Box>

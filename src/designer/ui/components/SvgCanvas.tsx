@@ -586,6 +586,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
 
   const onCanvasDrop = async (e: React.DragEvent) => {
     e.preventDefault();
+    if (engine.getState().viewMode) return;
     const p = clientToCanvas(e.clientX, e.clientY);
 
     // OS image file drop
@@ -650,6 +651,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
   // Handle OS clipboard paste (images, data URLs, SVG text)
   useEffect(() => {
     const onPaste = async (e: ClipboardEvent) => {
+      if (engine.getState().viewMode) return;
       const cb = e.clipboardData;
       if (!cb) return;
 

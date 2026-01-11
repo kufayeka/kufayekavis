@@ -117,9 +117,10 @@ export function DesignerApp({ projectId }: { projectId?: string }) {
 
   const setTool = useCallback(
     (tool: ToolType) => {
+      if (state.viewMode) return;
       engine.setTool(tool);
     },
-    [engine],
+    [engine, state.viewMode],
   );
 
   useEffect(() => {
@@ -134,6 +135,15 @@ export function DesignerApp({ projectId }: { projectId?: string }) {
 
       const isMac = navigator.platform.toLowerCase().includes("mac");
       const mod = isMac ? e.metaKey : e.ctrlKey;
+
+      // In View Mode, behave like Online Mode: do not allow editor mutations via hotkeys.
+      if (state.viewMode) {
+        if (e.key === "Escape") {
+          engine.clearSelection();
+          engine.setTool("select");
+        }
+        return;
+      }
 
       if (mod && !isEditable && e.key.toLowerCase() === "z") {
         e.preventDefault();

@@ -472,6 +472,18 @@ function createConnectionManager(api: DesignerAPI, registry?: DesignerRegistry) 
 
         const text = payload.toString("utf8");
         const parsed = jsonSafeParse(text);
+
+        // Safety: while editing, ignore remote control so properties don't change under the user.
+        // View Mode behaves like Online Mode, so remote control is allowed there.
+        if (!api.engine.getState().viewMode) {
+          if (parsed && typeof parsed === "object" && "requestId" in (parsed as Record<string, unknown>)) {
+            const requestId = (parsed as Record<string, unknown>).requestId;
+            if (typeof requestId === "string" && requestId.trim()) {
+              publishResponse({ requestId, ok: false, error: "Remote control is disabled in Edit Mode" });
+            }
+          }
+          return;
+        }
         applyRemoteControlCommand(api, registry ?? null, parsed, publishResponse);
       });
 

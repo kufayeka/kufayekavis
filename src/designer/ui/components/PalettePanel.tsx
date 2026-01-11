@@ -27,7 +27,7 @@ export function PalettePanel({
 
   // Free Draw is a tool (not a placeable palette element). If any plugin/registry
   // ever exposes it as a palette item, hide it to avoid showing it twice.
-  const visibleElementItems = elementItems.filter((it) => it.id !== "free");
+  const visibleElementItems = elementItems.filter((it) => it.id !== "free" && it.id !== "custom:customSvg");
 
   return (
     <div>

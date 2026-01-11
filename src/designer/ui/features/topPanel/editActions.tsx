@@ -26,7 +26,7 @@ function simpleAction(
     render: (ctxUnknown: unknown) => {
       const ctx = ctxUnknown as RibbonCtx;
       return (
-        <Button onClick={() => onClick(ctx)} disabled={disabled ? disabled(ctx) : false}>
+        <Button onClick={() => onClick(ctx)} disabled={ctx.state.viewMode || (disabled ? disabled(ctx) : false)}>
           {label}
         </Button>
       );
