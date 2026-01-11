@@ -29,7 +29,7 @@ Kalau URL kosong, plugin tidak connect dan `api.publishEvent(...)` akan fallback
 
 Setting plugin disimpan di project JSON:
 
-- Lokasi: `doc.pluginSettings["system.mqttScada"]`
+- Lokasi: `project.pluginSettings["system.mqttScada"]`
 - Tersimpan saat export: `engine.exportProjectJson()`
 - Ter-restore saat import: `engine.importProjectJson(json)`
 
@@ -40,7 +40,7 @@ Catatan penting:
 
 ## Parameter / Field konfigurasi
 
-Semua setting ini ada di `doc.pluginSettings["system.mqttScada"]`.
+Semua setting ini ada di `project.pluginSettings["system.mqttScada"]`.
 
 ### MQTT Connection
 

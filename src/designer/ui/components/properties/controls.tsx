@@ -53,14 +53,14 @@ function NumberInputField({
   onChange: (v: number) => void;
 }) {
   const lastValueRef = useRef(value);
-  const editingRef = useRef(false);
+  const [editing, setEditing] = useState(false);
   const [text, setText] = useState(() => String(Number.isFinite(value) ? value : 0));
 
   useEffect(() => {
     lastValueRef.current = value;
-    if (editingRef.current) return;
-    setText(String(Number.isFinite(value) ? value : 0));
   }, [value]);
+
+  const displayText = editing ? text : String(Number.isFinite(value) ? value : 0);
 
   const commit = () => {
     const n = Number(text);
@@ -76,15 +76,17 @@ function NumberInputField({
       id={id}
       fullWidth
       type="number"
-      value={text}
+      value={displayText}
       onFocus={() => {
-        editingRef.current = true;
+        setEditing(true);
+        setText(String(Number.isFinite(value) ? value : 0));
       }}
       onBlur={() => {
-        editingRef.current = false;
+        setEditing(false);
         commit();
       }}
       onChange={(e) => {
+        if (!editing) setEditing(true);
         setText(e.target.value);
       }}
       onKeyDown={(e) => {
@@ -111,14 +113,14 @@ function TextInputField({
   onChange: (v: string) => void;
 }) {
   const lastValueRef = useRef(value);
-  const editingRef = useRef(false);
+  const [editing, setEditing] = useState(false);
   const [text, setText] = useState(() => String(value ?? ""));
 
   useEffect(() => {
     lastValueRef.current = value;
-    if (editingRef.current) return;
-    setText(String(value ?? ""));
   }, [value]);
+
+  const displayText = editing ? text : String(value ?? "");
 
   const commit = () => {
     onChange(text);
@@ -128,15 +130,17 @@ function TextInputField({
     <TextField
       id={id}
       fullWidth
-      value={text}
+      value={displayText}
       onFocus={() => {
-        editingRef.current = true;
+        setEditing(true);
+        setText(String(value ?? ""));
       }}
       onBlur={() => {
-        editingRef.current = false;
+        setEditing(false);
         commit();
       }}
       onChange={(e) => {
+        if (!editing) setEditing(true);
         setText(e.target.value);
       }}
       onKeyDown={(e) => {
@@ -163,14 +167,14 @@ function TextAreaInputField({
   onChange: (v: string) => void;
 }) {
   const lastValueRef = useRef(value);
-  const editingRef = useRef(false);
+  const [editing, setEditing] = useState(false);
   const [text, setText] = useState(() => String(value ?? ""));
 
   useEffect(() => {
     lastValueRef.current = value;
-    if (editingRef.current) return;
-    setText(String(value ?? ""));
   }, [value]);
+
+  const displayText = editing ? text : String(value ?? "");
 
   const commit = () => {
     onChange(text);
@@ -182,15 +186,17 @@ function TextAreaInputField({
       fullWidth
       multiline
       minRows={3}
-      value={text}
+      value={displayText}
       onFocus={() => {
-        editingRef.current = true;
+        setEditing(true);
+        setText(String(value ?? ""));
       }}
       onBlur={() => {
-        editingRef.current = false;
+        setEditing(false);
         commit();
       }}
       onChange={(e) => {
+        if (!editing) setEditing(true);
         setText(e.target.value);
       }}
       onKeyDown={(e) => {

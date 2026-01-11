@@ -205,7 +205,7 @@ Fungsi:
 
 ### Konfigurasi
 - Buka dialog dari tombol **SCADA MQTT** di ribbon.
-- Tombol **Save** menyimpan pengaturan ke project JSON, di field `doc.pluginSettings["system.mqttScada"]`.
+- Tombol **Save** menyimpan pengaturan ke project JSON, di field `project.pluginSettings["system.mqttScada"]`.
 - Tombol **Test** hanya mengetes koneksi (connect/timeout).
 
 Catatan:

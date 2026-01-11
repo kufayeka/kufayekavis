@@ -8,7 +8,12 @@ import type { CustomElement } from "../../designer/core/types";
 import { coerceMotionPathLineProps } from "./motionPathLine.model";
 
 export function renderMotionPathLine(ctxUnknown: unknown): React.ReactNode {
-  const ctx = ctxUnknown as { element: CustomElement; engine: any };
+  const ctx = ctxUnknown as {
+    element: CustomElement;
+    engine?: {
+      getState?: () => { viewMode?: boolean };
+    };
+  };
   const el = ctx.element;
   const isOnline = ctx.engine?.getState?.()?.viewMode ?? false;
   return <MotionPathLineInner el={el} isOnline={isOnline} />;
@@ -120,6 +125,7 @@ function MotionPathLineInner({ el, isOnline }: { el: CustomElement; isOnline: bo
     p.particleSize,
     p.particleColor,
     p.particleOpacity,
+    isOnline,
     particleCount,
     lineLength,
   ]);
