@@ -62,6 +62,10 @@ export function createRect(partial: Partial<RectElement> & { id: string; zIndex:
     height: partial.height ?? 100,
     rx: partial.rx ?? 0,
     ry: partial.ry ?? 0,
+
+    fillStyle: partial.fillStyle ?? "solid",
+    fillVerticalEdgeFadeEdgePct: partial.fillVerticalEdgeFadeEdgePct ?? 30,
+    fillEdgeFadeMidOpacity: partial.fillEdgeFadeMidOpacity ?? 0.35,
     rotation: partial.rotation ?? 0,
     opacity: partial.opacity ?? 1,
     stroke: partial.stroke ?? baseDefaults().stroke,
@@ -109,7 +113,7 @@ export function createLine(partial: Partial<LineElement> & { id: string; zIndex:
     opacity: partial.opacity ?? 1,
     stroke: partial.stroke ?? baseDefaults().stroke,
     strokeWidth: partial.strokeWidth ?? baseDefaults().strokeWidth,
-    fill: "transparent",
+    fill: partial.fill ?? baseDefaults().fill,
   };
 }
 
@@ -128,7 +132,7 @@ export function createFree(partial: Partial<FreeDrawElement> & { id: string; zIn
     opacity: partial.opacity ?? 1,
     stroke: partial.stroke ?? baseDefaults().stroke,
     strokeWidth: partial.strokeWidth ?? baseDefaults().strokeWidth,
-    fill: "transparent",
+    fill: partial.fill ?? baseDefaults().fill,
   };
 }
 
@@ -157,7 +161,7 @@ export function createImage(partial: Partial<ImageElement> & { id: string; zInde
     opacity: partial.opacity ?? 1,
     stroke: "transparent",
     strokeWidth: 0,
-    fill: "transparent",
+    fill: partial.fill ?? baseDefaults().fill,
   };
 }
 
@@ -201,7 +205,7 @@ export function createGroup(partial: Partial<GroupElement> & { id: string; zInde
     opacity: 1,
     stroke: "transparent",
     strokeWidth: 0,
-    fill: "transparent",
+    fill: partial.fill ?? baseDefaults().fill,
   };
 }
 

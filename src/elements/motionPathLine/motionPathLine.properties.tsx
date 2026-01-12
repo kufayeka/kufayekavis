@@ -48,7 +48,7 @@ export function renderMotionPathLineProperties(ctxUnknown: unknown): React.React
           }
         />
 
-        <Row id={`${baseId}-speed`} label="Speed (s)" control={numberInput(`${baseId}-speed`, p.particleSpeed, (v) => setProps({ particleSpeed: Math.max(0.05, v) }))} />
+        <Row id={`${baseId}-speed`} label={p.particlePlacement === "single" ? "Speed (px/s)" : "Speed (s)"} control={numberInput(`${baseId}-speed`, p.particleSpeed, (v) => setProps({ particleSpeed: Math.max(0.05, v) }))} />
 
         <Row
           id={`${baseId}-placement`}

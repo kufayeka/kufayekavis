@@ -31,7 +31,7 @@ export type MotionPathLineProps = {
   particleOpacity: number;
   particleGap: number; // px spacing between particles along the path
   particleDirection: MotionPathLineDirection;
-  particleSpeed: number; // seconds per traversal (independent of line length)
+  particleSpeed: number; // for "along": seconds per traversal; for "single": pixels per second
 
   // Animation
   animate: boolean;

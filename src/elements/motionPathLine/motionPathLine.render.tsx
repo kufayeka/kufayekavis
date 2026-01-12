@@ -61,7 +61,9 @@ function MotionPathLineInner({ el, isOnline }: { el: CustomElement; isOnline: bo
     const nodes = particleRefs.current.filter(Boolean) as SVGElement[];
     if (nodes.length === 0) return;
 
-    const duration = Math.max(0.05, p.particleSpeed); // seconds per traversal (by design)
+    const duration = p.particlePlacement === "single"
+      ? Math.max(0.05, lineLength / Math.max(0.1, p.particleSpeed)) // pixel per second for single particle
+      : Math.max(0.05, p.particleSpeed); // seconds per traversal for along path
 
     let totalLength = 1;
     try {

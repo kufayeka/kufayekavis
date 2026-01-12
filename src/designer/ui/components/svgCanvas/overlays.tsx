@@ -7,6 +7,20 @@ import { getBBoxCenter } from "../../../core/geometry";
 import type { DragMode } from "./dragTypes";
  import { MOTION_PATH_LINE_KIND, coerceMotionPathLineProps } from "../../../../elements/motionPathLine/motionPathLine.model";
 
+function adjustHandleForFlip(el: any, handle: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w"): "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w" {
+  const meta = el as { flipH?: boolean; flipV?: boolean };
+  let adjusted = handle;
+  if (meta.flipH) {
+    if (adjusted.includes('e')) adjusted = adjusted.replace('e', 'w') as any;
+    else if (adjusted.includes('w')) adjusted = adjusted.replace('w', 'e') as any;
+  }
+  if (meta.flipV) {
+    if (adjusted.includes('s')) adjusted = adjusted.replace('s', 'n') as any;
+    else if (adjusted.includes('n')) adjusted = adjusted.replace('n', 's') as any;
+  }
+  return adjusted;
+}
+
 export function SelectionOverlay({
   box,
   state,
@@ -87,7 +101,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-text",
                   id: single.id,
-                  handle: "nw",
+                  handle: adjustHandleForFlip(single, "nw"),
                   startX: p.x,
                   startY: p.y,
                   startFontSize: single.fontSize,
@@ -97,7 +111,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-rect",
                   id: single.id,
-                  handle: "nw",
+                  handle: adjustHandleForFlip(single, "nw"),
                   startX: p.x,
                   startY: p.y,
                   start: { x: single.x, y: single.y, w: single.width, h: single.height },
@@ -118,7 +132,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-text",
                   id: single.id,
-                  handle: "n",
+                  handle: adjustHandleForFlip(single, "n"),
                   startX: p.x,
                   startY: p.y,
                   startFontSize: single.fontSize,
@@ -128,7 +142,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-rect",
                   id: single.id,
-                  handle: "n",
+                  handle: adjustHandleForFlip(single, "n"),
                   startX: p.x,
                   startY: p.y,
                   start: { x: single.x, y: single.y, w: single.width, h: single.height },
@@ -149,7 +163,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-text",
                   id: single.id,
-                  handle: "ne",
+                  handle: adjustHandleForFlip(single, "ne"),
                   startX: p.x,
                   startY: p.y,
                   startFontSize: single.fontSize,
@@ -159,7 +173,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-rect",
                   id: single.id,
-                  handle: "ne",
+                  handle: adjustHandleForFlip(single, "ne"),
                   startX: p.x,
                   startY: p.y,
                   start: { x: single.x, y: single.y, w: single.width, h: single.height },
@@ -180,7 +194,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-text",
                   id: single.id,
-                  handle: "e",
+                  handle: adjustHandleForFlip(single, "e"),
                   startX: p.x,
                   startY: p.y,
                   startFontSize: single.fontSize,
@@ -190,7 +204,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-rect",
                   id: single.id,
-                  handle: "e",
+                  handle: adjustHandleForFlip(single, "e"),
                   startX: p.x,
                   startY: p.y,
                   start: { x: single.x, y: single.y, w: single.width, h: single.height },
@@ -211,7 +225,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-text",
                   id: single.id,
-                  handle: "sw",
+                  handle: adjustHandleForFlip(single, "sw"),
                   startX: p.x,
                   startY: p.y,
                   startFontSize: single.fontSize,
@@ -221,7 +235,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-rect",
                   id: single.id,
-                  handle: "sw",
+                  handle: adjustHandleForFlip(single, "sw"),
                   startX: p.x,
                   startY: p.y,
                   start: { x: single.x, y: single.y, w: single.width, h: single.height },
@@ -242,7 +256,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-text",
                   id: single.id,
-                  handle: "s",
+                  handle: adjustHandleForFlip(single, "s"),
                   startX: p.x,
                   startY: p.y,
                   startFontSize: single.fontSize,
@@ -252,7 +266,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-rect",
                   id: single.id,
-                  handle: "s",
+                  handle: adjustHandleForFlip(single, "s"),
                   startX: p.x,
                   startY: p.y,
                   start: { x: single.x, y: single.y, w: single.width, h: single.height },
@@ -273,7 +287,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-text",
                   id: single.id,
-                  handle: "se",
+                  handle: adjustHandleForFlip(single, "se"),
                   startX: p.x,
                   startY: p.y,
                   startFontSize: single.fontSize,
@@ -283,7 +297,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-rect",
                   id: single.id,
-                  handle: "se",
+                  handle: adjustHandleForFlip(single, "se"),
                   startX: p.x,
                   startY: p.y,
                   start: { x: single.x, y: single.y, w: single.width, h: single.height },
@@ -304,7 +318,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-text",
                   id: single.id,
-                  handle: "w",
+                  handle: adjustHandleForFlip(single, "w"),
                   startX: p.x,
                   startY: p.y,
                   startFontSize: single.fontSize,
@@ -314,7 +328,7 @@ export function SelectionOverlay({
                 onStartResize({
                   kind: "resize-rect",
                   id: single.id,
-                  handle: "w",
+                  handle: adjustHandleForFlip(single, "w"),
                   startX: p.x,
                   startY: p.y,
                   start: { x: single.x, y: single.y, w: single.width, h: single.height },

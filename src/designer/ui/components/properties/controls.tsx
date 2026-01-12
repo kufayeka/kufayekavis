@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { HexColorPicker } from "react-colorful";
 import clsx from "clsx";
-import { Button, IconButton, Popover, TextField, Typography } from "@mui/material";
+import { Button, IconButton, MenuItem, Popover, TextField, Typography } from "@mui/material";
 
 // Helper function to normalize URLs
 export function normalizeUrl(url: string): string {
@@ -278,6 +278,38 @@ export function ColorInput({
         </div>
       </Popover>
     </div>
+  );
+}
+
+export function selectInput(id: string, value: string, options: { value: string; label: string }[], onChange: (v: string) => void) {
+  return <SelectInput id={id} value={value} options={options} onChange={onChange} />;
+}
+
+function SelectInput({
+  id,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <TextField
+      id={id}
+      select
+      fullWidth
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {options.map((option) => (
+        <MenuItem key={option.value} value={option.value}>
+          {option.label}
+        </MenuItem>
+      ))}
+    </TextField>
   );
 }
 

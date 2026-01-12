@@ -46,6 +46,15 @@ export type RectElement = BaseElement & {
   height: number;
   rx: number;
   ry: number;
+
+  // Fill rendering mode. When omitted, defaults to solid fill.
+  fillStyle?: "solid" | "verticalEdgeFade" | "horizontalEdgeFade";
+  // Fade size in percent (0..50). Used when fillStyle === 'verticalEdgeFade'.
+  fillVerticalEdgeFadeEdgePct?: number;
+
+  // Controls how gradual the fade ramp is (0..1). Lower = smoother.
+  // Used for both verticalEdgeFade and horizontalEdgeFade.
+  fillEdgeFadeMidOpacity?: number;
 };
 
 export type CircleElement = BaseElement & {

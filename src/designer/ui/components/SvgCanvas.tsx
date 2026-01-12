@@ -299,7 +299,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
         for (const id of drag.ids) {
           const el = elRefs.current.get(id);
           if (el) {
-            el.style.transform = `translate(${dx}px, ${dy}px)`;
+            el.setAttribute("transform", `translate(${dx} ${dy}) ${drag.originalTransforms[id]}`);
           }
         }
 
@@ -456,7 +456,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
         // Reset visual
         for (const id of drag.ids) {
           const el = elRefs.current.get(id);
-          if (el) el.style.transform = '';
+          if (el) el.setAttribute("transform", drag.originalTransforms[id]);
         }
       }
 
@@ -616,6 +616,12 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       if (el) startElements[mid] = el;
     }
 
+    const originalTransforms: Record<ElementId, string> = {};
+    for (const id of movableIds) {
+      const el = elRefs.current.get(id);
+      originalTransforms[id] = el?.getAttribute("transform") || "";
+    }
+
     // Start move
     engine.beginHistoryBatch();
     const p = clientToCanvas(e.clientX, e.clientY);
@@ -630,6 +636,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       startBox: getSelectionBBox(movableIds, engine.getState().doc),
       lastDx: 0,
       lastDy: 0,
+      originalTransforms,
     };
     setDragUi({
       kind: "move",
@@ -642,6 +649,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
       startBox: getSelectionBBox(movableIds, engine.getState().doc),
       lastDx: 0,
       lastDy: 0,
+      originalTransforms,
     });
   };
 

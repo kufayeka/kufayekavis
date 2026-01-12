@@ -69,6 +69,10 @@ const rectSchema = baseElementSchema().extend({
   height: zNum(100, { min: 1 }),
   rx: zNum(0, { min: 0 }),
   ry: zNum(0, { min: 0 }),
+
+  fillStyle: z.enum(["solid", "verticalEdgeFade", "horizontalEdgeFade"]).optional(),
+  fillVerticalEdgeFadeEdgePct: zNum(30, { min: 0, max: 50 }).optional(),
+  fillEdgeFadeMidOpacity: zNum(0.35, { min: 0, max: 1 }).optional(),
 });
 
 const circleSchema = baseElementSchema().extend({

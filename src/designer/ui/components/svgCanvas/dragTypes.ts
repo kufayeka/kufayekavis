@@ -13,6 +13,7 @@ export type DragMode =
       startBox: { x: number; y: number; width: number; height: number } | null;
       lastDx: number;
       lastDy: number;
+      originalTransforms: Record<ElementId, string>;
     }
   | {
       kind: "marquee";

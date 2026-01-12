@@ -82,6 +82,32 @@ function renderElementToSvg(
     const cx = r.x + r.width / 2;
     const cy = r.y + r.height / 2;
     const transform = buildTransformAttr(r.rotation, r.flipH, r.flipV, cx, cy);
+
+    const fillStyle = r.fillStyle ?? "solid";
+    if (fillStyle === "verticalEdgeFade" || fillStyle === "horizontalEdgeFade") {
+      const edgePctRaw = typeof r.fillVerticalEdgeFadeEdgePct === "number" ? r.fillVerticalEdgeFadeEdgePct : 30;
+      const edgePct = clamp(edgePctRaw, 0, 50);
+      const midOpacityRaw = typeof r.fillEdgeFadeMidOpacity === "number" ? r.fillEdgeFadeMidOpacity : 0.35;
+      const midOpacity = clamp01(midOpacityRaw);
+
+      const gid = `rect-${fillStyle === "verticalEdgeFade" ? "vert" : "horiz"}-fade-${escapeXml(String(r.id))}`;
+      const axisAttrs =
+        fillStyle === "verticalEdgeFade"
+          ? `x1=\"0%\" y1=\"0%\" x2=\"0%\" y2=\"100%\"`
+          : `x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"0%\"`;
+
+      const startMid = clamp(edgePct * 0.5, 0, 50);
+      const endMid = 100 - startMid;
+
+      // Inline defs for this rect (keeps export logic simple and self-contained)
+      const defs = `<defs>\n  <linearGradient id=\"${gid}\" ${axisAttrs}>\n    <stop offset=\"0%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"0\" />\n    <stop offset=\"${startMid}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"${midOpacity}\" />\n    <stop offset=\"${edgePct}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"1\" />\n    <stop offset=\"${100 - edgePct}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"1\" />\n    <stop offset=\"${endMid}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"${midOpacity}\" />\n    <stop offset=\"100%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"0\" />\n  </linearGradient>\n</defs>`;
+
+      const attrsNoFill = attrs.filter((a) => !a.startsWith("fill=\""));
+      attrsNoFill.push(`fill=\"url(#${gid})\"`);
+
+      return `<g>${defs}\n<rect x=\"${r.x}\" y=\"${r.y}\" width=\"${r.width}\" height=\"${r.height}\" ${attrsNoFill.join(" ")} ${transform} /></g>`;
+    }
+
     return `<rect x=\"${r.x}\" y=\"${r.y}\" width=\"${r.width}\" height=\"${r.height}\" ${attrs.join(" ")} ${transform} />`;
   }
   if (el.type === "circle") {
