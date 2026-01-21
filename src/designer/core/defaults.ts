@@ -66,6 +66,7 @@ export function createRect(partial: Partial<RectElement> & { id: string; zIndex:
     fillStyle: partial.fillStyle ?? "solid",
     fillVerticalEdgeFadeEdgePct: partial.fillVerticalEdgeFadeEdgePct ?? 30,
     fillEdgeFadeMidOpacity: partial.fillEdgeFadeMidOpacity ?? 0.35,
+    variant: partial.variant ?? "flat",
     rotation: partial.rotation ?? 0,
     opacity: partial.opacity ?? 1,
     stroke: partial.stroke ?? baseDefaults().stroke,

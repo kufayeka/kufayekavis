@@ -84,6 +84,8 @@ function renderElementToSvg(
     const transform = buildTransformAttr(r.rotation, r.flipH, r.flipV, cx, cy);
 
     const fillStyle = r.fillStyle ?? "solid";
+    const variant = r.variant ?? "flat";
+
     if (fillStyle === "verticalEdgeFade" || fillStyle === "horizontalEdgeFade") {
       const edgePctRaw = typeof r.fillVerticalEdgeFadeEdgePct === "number" ? r.fillVerticalEdgeFadeEdgePct : 30;
       const edgePct = clamp(edgePctRaw, 0, 50);
@@ -93,19 +95,43 @@ function renderElementToSvg(
       const gid = `rect-${fillStyle === "verticalEdgeFade" ? "vert" : "horiz"}-fade-${escapeXml(String(r.id))}`;
       const axisAttrs =
         fillStyle === "verticalEdgeFade"
-          ? `x1=\"0%\" y1=\"0%\" x2=\"0%\" y2=\"100%\"`
-          : `x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"0%\"`;
+          ? `x1="0%" y1="0%" x2="0%" y2="100%"`
+          : `x1="0%" y1="0%" x2="100%" y2="0%"`;
 
       const startMid = clamp(edgePct * 0.5, 0, 50);
       const endMid = 100 - startMid;
 
+      const filterDef = variant === "flat" ? "" : (() => {
+        // simple filter defs matching renderer
+        if (variant === "emboss") {
+          return `<filter id="rect-variant-emboss-${escapeXml(String(r.id))}" x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox">\n  <feOffset dx=\"-2\" dy=\"-2\" result=\"off1\" />\n  <feGaussianBlur in=\"off1\" stdDeviation=\"2\" result=\"blur1\" />\n  <feFlood flood-color=\"#ffffff\" flood-opacity=\"0.6\" result=\"flood1\" />\n  <feComposite in=\"flood1\" in2=\"blur1\" operator=\"in\" result=\"comp1\" />\n  <feOffset dx=\"2\" dy=\"2\" result=\"off2\" />\n  <feGaussianBlur in=\"off2\" stdDeviation=\"2\" result=\"blur2\" />\n  <feFlood flood-color=\"#000000\" flood-opacity=\"0.45\" result=\"flood2\" />\n  <feComposite in=\"flood2\" in2=\"blur2\" operator=\"in\" result=\"comp2\" />\n  <feMerge>\n    <feMergeNode in=\"comp1\"/>\n    <feMergeNode in=\"comp2\"/>\n    <feMergeNode in=\"SourceGraphic\"/>\n  </feMerge>\n</filter>`;
+        }
+        // bevel
+        return `<filter id=\"rect-variant-bevel-${escapeXml(String(r.id))}\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\" filterUnits=\"objectBoundingBox\">\n  <feOffset dx=\"-1\" dy=\"-1\" result=\"off1\" />\n  <feGaussianBlur in=\"off1\" stdDeviation=\"1.2\" result=\"blur1\" />\n  <feFlood flood-color=\"#ffffff\" flood-opacity=\"0.35\" result=\"flood1\" />\n  <feComposite in=\"flood1\" in2=\"blur1\" operator=\"in\" result=\"comp1\" />\n  <feOffset dx=\"1\" dy=\"1\" result=\"off2\" />\n  <feGaussianBlur in=\"off2\" stdDeviation=\"1.2\" result=\"blur2\" />\n  <feFlood flood-color=\"#000000\" flood-opacity=\"0.35\" result=\"flood2\" />\n  <feComposite in=\"flood2\" in2=\"blur2\" operator=\"in\" result=\"comp2\" />\n  <feMerge>\n    <feMergeNode in=\"comp1\"/>\n    <feMergeNode in=\"comp2\"/>\n    <feMergeNode in=\"SourceGraphic\"/>\n  </feMerge>\n</filter>`;
+      })();
+
       // Inline defs for this rect (keeps export logic simple and self-contained)
-      const defs = `<defs>\n  <linearGradient id=\"${gid}\" ${axisAttrs}>\n    <stop offset=\"0%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"0\" />\n    <stop offset=\"${startMid}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"${midOpacity}\" />\n    <stop offset=\"${edgePct}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"1\" />\n    <stop offset=\"${100 - edgePct}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"1\" />\n    <stop offset=\"${endMid}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"${midOpacity}\" />\n    <stop offset=\"100%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"0\" />\n  </linearGradient>\n</defs>`;
+      const defs = `<defs>\n  <linearGradient id=\"${gid}\" ${axisAttrs}>\n    <stop offset=\"0%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"0\" />\n    <stop offset=\"${startMid}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"${midOpacity}\" />\n    <stop offset=\"${edgePct}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"1\" />\n    <stop offset=\"${100 - edgePct}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"1\" />\n    <stop offset=\"${endMid}%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"${midOpacity}\" />\n    <stop offset=\"100%\" stop-color=\"${escapeXml(String(r.fill))}\" stop-opacity=\"0\" />\n  </linearGradient>\n${filterDef}\n</defs>`;
 
       const attrsNoFill = attrs.filter((a) => !a.startsWith("fill=\""));
       attrsNoFill.push(`fill=\"url(#${gid})\"`);
+      if (variant !== "flat") attrsNoFill.push(`filter=\"url(#rect-variant-${variant}-${escapeXml(String(r.id))})\"`);
 
       return `<g>${defs}\n<rect x=\"${r.x}\" y=\"${r.y}\" width=\"${r.width}\" height=\"${r.height}\" ${attrsNoFill.join(" ")} ${transform} /></g>`;
+    }
+
+    // If variant is not flat and fill is solid we need to inline a filter def as well
+    if ((r.variant ?? "flat") !== "flat") {
+      const variant = r.variant ?? "flat";
+      const filterDef = variant === "emboss"
+        ? `<defs>\n  <filter id=\"rect-variant-emboss-${escapeXml(String(r.id))}\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\" filterUnits=\"objectBoundingBox\">\n  <feOffset dx=\"-2\" dy=\"-2\" result=\"off1\" />\n  <feGaussianBlur in=\"off1\" stdDeviation=\"2\" result=\"blur1\" />\n  <feFlood flood-color=\"#ffffff\" flood-opacity=\"0.6\" result=\"flood1\" />\n  <feComposite in=\"flood1\" in2=\"blur1\" operator=\"in\" result=\"comp1\" />\n  <feOffset dx=\"2\" dy=\"2\" result=\"off2\" />\n  <feGaussianBlur in=\"off2\" stdDeviation=\"2\" result=\"blur2\" />\n  <feFlood flood-color=\"#000000\" flood-opacity=\"0.45\" result=\"flood2\" />\n  <feComposite in=\"flood2\" in2=\"blur2\" operator=\"in\" result=\"comp2\" />\n  <feMerge>\n    <feMergeNode in=\"comp1\"/>\n    <feMergeNode in=\"comp2\"/>\n    <feMergeNode in=\"SourceGraphic\"/>\n  </feMerge>\n</filter>\n</defs>`
+        : `<defs>\n  <filter id=\"rect-variant-bevel-${escapeXml(String(r.id))}\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\" filterUnits=\"objectBoundingBox\">\n  <feOffset dx=\"-1\" dy=\"-1\" result=\"off1\" />\n  <feGaussianBlur in=\"off1\" stdDeviation=\"1.2\" result=\"blur1\" />\n  <feFlood flood-color=\"#ffffff\" flood-opacity=\"0.35\" result=\"flood1\" />\n  <feComposite in=\"flood1\" in2=\"blur1\" operator=\"in\" result=\"comp1\" />\n  <feOffset dx=\"1\" dy=\"1\" result=\"off2\" />\n  <feGaussianBlur in=\"off2\" stdDeviation=\"1.2\" result=\"blur2\" />\n  <feFlood flood-color=\"#000000\" flood-opacity=\"0.35\" result=\"flood2\" />\n  <feComposite in=\"flood2\" in2=\"blur2\" operator=\"in\" result=\"comp2\" />\n  <feMerge>\n    <feMergeNode in=\"comp1\"/>\n    <feMergeNode in=\"comp2\"/>\n    <feMergeNode in=\"SourceGraphic\"/>\n  </feMerge>\n</filter>\n</defs>`;
+
+      const attrsNoFill = attrs.filter((a) => !a.startsWith("fill=\""));
+      attrsNoFill.push(`fill=\"${escapeXml(String(r.fill))}\"`);
+      attrsNoFill.push(`filter=\"url(#rect-variant-${variant}-${escapeXml(String(r.id))})\"`);
+
+      return `<g>${filterDef}\n<rect x=\"${r.x}\" y=\"${r.y}\" width=\"${r.width}\" height=\"${r.height}\" ${attrsNoFill.join(" ")} ${transform} /></g>`;
     }
 
     return `<rect x=\"${r.x}\" y=\"${r.y}\" width=\"${r.width}\" height=\"${r.height}\" ${attrs.join(" ")} ${transform} />`;

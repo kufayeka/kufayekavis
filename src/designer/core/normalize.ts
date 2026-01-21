@@ -73,6 +73,7 @@ const rectSchema = baseElementSchema().extend({
   fillStyle: z.enum(["solid", "verticalEdgeFade", "horizontalEdgeFade"]).optional(),
   fillVerticalEdgeFadeEdgePct: zNum(30, { min: 0, max: 50 }).optional(),
   fillEdgeFadeMidOpacity: zNum(0.35, { min: 0, max: 1 }).optional(),
+  variant: z.enum(["flat", "emboss", "bevel"]).optional(),
 });
 
 const circleSchema = baseElementSchema().extend({

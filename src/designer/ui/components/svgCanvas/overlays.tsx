@@ -7,18 +7,18 @@ import { getBBoxCenter } from "../../../core/geometry";
 import type { DragMode } from "./dragTypes";
  import { MOTION_PATH_LINE_KIND, coerceMotionPathLineProps } from "../../../../elements/motionPathLine/motionPathLine.model";
 
-function adjustHandleForFlip(el: any, handle: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w"): "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w" {
-  const meta = el as { flipH?: boolean; flipV?: boolean };
-  let adjusted = handle;
+function adjustHandleForFlip(el: { flipH?: boolean; flipV?: boolean }, handle: "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w"): "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w" {
+  const meta = el;
+  let adjusted = handle as string;
   if (meta.flipH) {
-    if (adjusted.includes('e')) adjusted = adjusted.replace('e', 'w') as any;
-    else if (adjusted.includes('w')) adjusted = adjusted.replace('w', 'e') as any;
+    if (adjusted.includes('e')) adjusted = adjusted.replace('e', 'w');
+    else if (adjusted.includes('w')) adjusted = adjusted.replace('w', 'e');
   }
   if (meta.flipV) {
-    if (adjusted.includes('s')) adjusted = adjusted.replace('s', 'n') as any;
-    else if (adjusted.includes('n')) adjusted = adjusted.replace('n', 's') as any;
+    if (adjusted.includes('s')) adjusted = adjusted.replace('s', 'n');
+    else if (adjusted.includes('n')) adjusted = adjusted.replace('n', 's');
   }
-  return adjusted;
+  return adjusted as "nw" | "ne" | "sw" | "se" | "n" | "e" | "s" | "w";
 }
 
 export function SelectionOverlay({

@@ -56,6 +56,23 @@ export function renderRectProperties(ctxUnknown: unknown): React.ReactNode {
         }
       />
 
+      <Row
+        id={`${baseId}-variant`}
+        label="Variant"
+        control={
+          selectInput(
+            `${baseId}-variant`,
+            r.variant ?? "flat",
+            [
+              { value: "flat", label: "Flat" },
+              { value: "emboss", label: "Emboss" },
+              { value: "bevel", label: "Bevel" },
+            ],
+            (v) => engine.updateElement(r.id, { variant: v as RectElement["variant"] }),
+          )
+        }
+      />
+
       {fillStyle === "verticalEdgeFade" || fillStyle === "horizontalEdgeFade" ? (
         <Row
           id={`${baseId}-fill-edge-pct`}

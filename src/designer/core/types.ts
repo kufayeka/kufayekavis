@@ -55,6 +55,12 @@ export type RectElement = BaseElement & {
   // Controls how gradual the fade ramp is (0..1). Lower = smoother.
   // Used for both verticalEdgeFade and horizontalEdgeFade.
   fillEdgeFadeMidOpacity?: number;
+
+  // Visual variant for the rect border/face.
+  // - flat: no special shading
+  // - emboss: raised look (light top-left, dark bottom-right)
+  // - bevel: softer beveled look
+  variant?: "flat" | "emboss" | "bevel";
 };
 
 export type CircleElement = BaseElement & {
