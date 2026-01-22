@@ -13,6 +13,7 @@ export function RenderTree({
   renderCustom,
   renderNativeByDefinition,
   api,
+  viewMode,
   runtimePatches,
 }: {
   doc: DesignerState["doc"];
@@ -21,6 +22,7 @@ export function RenderTree({
   renderCustom: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
   renderNativeByDefinition?: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
   api: DesignerAPI;
+  viewMode?: boolean;
   runtimePatches?: Record<ElementId, Partial<DesignerElement>>;
 }) {
   const applyRuntimePatch = (el: DesignerElement): DesignerElement => {
@@ -61,6 +63,7 @@ export function RenderTree({
           renderNativeByDefinition={renderNativeByDefinition}
           api={api}
           forcePublishElementEvents={forcePublishElementEvents}
+          viewMode={viewMode}
           runtimePatches={runtimePatches}
         />
       ))}
@@ -76,6 +79,7 @@ const RenderElement = memo(function RenderElement({
   renderNativeByDefinition,
   api,
   forcePublishElementEvents,
+  viewMode,
   runtimePatches,
 }: {
   el: DesignerElement;
@@ -85,6 +89,7 @@ const RenderElement = memo(function RenderElement({
   renderNativeByDefinition?: (el: DesignerElement, doc: DesignerState["doc"]) => React.ReactNode;
   api: DesignerAPI;
   forcePublishElementEvents: boolean;
+  viewMode?: boolean;
   runtimePatches?: Record<ElementId, Partial<DesignerElement>>;
 }) {
   if (el.hidden) return null;
@@ -123,7 +128,46 @@ const RenderElement = memo(function RenderElement({
     return typeof v === "string" && v.trim() ? v : undefined;
   };
 
+  const shouldConfirmButtonClick = (el: DesignerElement): null | {
+    text: string;
+    okAlias: string;
+    cancelAlias: string;
+  } => {
+    if (el.type !== "custom") return null;
+    const kind = (el as unknown as { kind?: unknown }).kind;
+    if (kind !== "button") return null;
+
+    const props = (el.props ?? {}) as Record<string, unknown>;
+    const use = Boolean(props.useConfirmationDialog ?? false);
+    if (!use) return null;
+
+    const text = typeof props.confirmationDialogText === "string" ? props.confirmationDialogText : "Are you sure?";
+    const okAlias = typeof props.okAlias === "string" ? props.okAlias : "OK";
+    const cancelAlias = typeof props.cancelAlias === "string" ? props.cancelAlias : "Cancel";
+    return { text, okAlias, cancelAlias };
+  };
+
   const publishElementEvent = (el: DesignerElement, eventType: "onMouseEnter" | "onClick" | "onMouseLeave") => {
+    // IMPORTANT: UI event publishing is an Online/View Mode feature.
+    // In Edit Mode, clicks should edit/select elements and must not publish or confirm.
+    if (!viewMode) return;
+
+    if (eventType === "onClick") {
+      const confirmCfg = shouldConfirmButtonClick(el);
+      if (confirmCfg) {
+        // Note: browser confirm() does not allow custom button labels.
+        const hint = (confirmCfg.okAlias || confirmCfg.cancelAlias)
+          ? `\n\n[OK: ${confirmCfg.okAlias || "OK"}]  [Cancel: ${confirmCfg.cancelAlias || "Cancel"}]`
+          : "";
+        const message = `${confirmCfg.text || "Are you sure?"}${hint}`;
+
+        if (typeof window !== "undefined") {
+          const ok = window.confirm(message);
+          if (!ok) return;
+        }
+      }
+    }
+
     const topic = resolveEventTopic(el);
     if (eventType === "onClick") {
       const action = getOnClickAction(el);
@@ -187,6 +231,7 @@ const RenderElement = memo(function RenderElement({
             renderCustom={renderCustom}
             api={api}
             forcePublishElementEvents={forcePublishElementEvents}
+            viewMode={viewMode}
             runtimePatches={runtimePatches}
           />
         ))}
@@ -205,17 +250,17 @@ const RenderElement = memo(function RenderElement({
           transform={getTransformForElement()}
           className="cursor-move"
           onMouseEnter={
-            effectiveForcePublishElementEvents || elPatched.enableOnMouseHoverEventListener
+            viewMode && (effectiveForcePublishElementEvents || elPatched.enableOnMouseHoverEventListener)
               ? () => publishElementEvent(elPatched, "onMouseEnter")
               : undefined
           }
           onClick={
-            effectiveForcePublishElementEvents || elPatched.enableOnMouseClickEventListener
+            viewMode && (effectiveForcePublishElementEvents || elPatched.enableOnMouseClickEventListener)
               ? () => publishElementEvent(elPatched, "onClick")
               : undefined
           }
           onMouseLeave={
-            effectiveForcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener
+            viewMode && (effectiveForcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener)
               ? () => publishElementEvent(elPatched, "onMouseLeave")
               : undefined
           }
@@ -240,17 +285,17 @@ const RenderElement = memo(function RenderElement({
         transform={transform}
         className="cursor-move"
         onMouseEnter={
-          effectiveForcePublishElementEvents || elPatched.enableOnMouseHoverEventListener
+          viewMode && (effectiveForcePublishElementEvents || elPatched.enableOnMouseHoverEventListener)
             ? () => publishElementEvent(elPatched, "onMouseEnter")
             : undefined
         }
         onClick={
-          effectiveForcePublishElementEvents || elPatched.enableOnMouseClickEventListener
+          viewMode && (effectiveForcePublishElementEvents || elPatched.enableOnMouseClickEventListener)
             ? () => publishElementEvent(elPatched, "onClick")
             : undefined
         }
         onMouseLeave={
-          effectiveForcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener
+          viewMode && (effectiveForcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener)
             ? () => publishElementEvent(elPatched, "onMouseLeave")
             : undefined
         }

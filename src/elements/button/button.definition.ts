@@ -32,6 +32,12 @@ export const buttonElementDefinition: ElementDefinition = {
             underline: false,
             borderRadius: 4,
             onClickAction: "",
+
+            // Confirmation dialog
+            useConfirmationDialog: false,
+            confirmationDialogText: "Are you sure?",
+            okAlias: "OK",
+            cancelAlias: "Cancel",
         },
     }),
 

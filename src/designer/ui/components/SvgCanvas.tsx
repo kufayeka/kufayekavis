@@ -1009,6 +1009,7 @@ export function SvgCanvas({ engine, state }: { engine: DesignerEngine; state: De
               renderCustom={renderCustom}
               renderNativeByDefinition={renderNativeByDefinition}
               api={host.api}
+              viewMode={Boolean(state.viewMode)}
               runtimePatches={state.viewMode ? state.runtime?.elementPatches : undefined}
             />
 

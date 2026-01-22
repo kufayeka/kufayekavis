@@ -30,6 +30,11 @@ export function renderButtonProperties(ctxUnknown: unknown): React.ReactNode {
   const underline = Boolean(props.underline ?? false);
   const onClickAction = String(props.onClickAction ?? "");
 
+  const useConfirmationDialog = Boolean(props.useConfirmationDialog ?? false);
+  const confirmationDialogText = String(props.confirmationDialogText ?? "Are you sure?");
+  const okAlias = String(props.okAlias ?? "OK");
+  const cancelAlias = String(props.cancelAlias ?? "Cancel");
+
   return (
     <div className="rounded border border-black/10 p-2 space-y-2">
       <div className="text-sm font-medium">Button</div>
@@ -102,6 +107,51 @@ export function renderButtonProperties(ctxUnknown: unknown): React.ReactNode {
         fullWidth
         helperText='Optional metadata sent with MQTT event "onClick" as field "action".'
       />
+
+      <div className="rounded border border-black/10 p-2 space-y-2">
+        <div className="text-xs font-medium text-black/70">Confirmation Dialog</div>
+
+        <FormControlLabel
+          control={
+            <Switch
+              checked={useConfirmationDialog}
+              onChange={(e) => api.updateCustomProps(c.id, { useConfirmationDialog: e.target.checked })}
+            />
+          }
+          label="Use confirm() before click"
+        />
+
+        <TextField
+          label="Dialog Text"
+          value={confirmationDialogText}
+          onChange={(e) => api.updateCustomProps(c.id, { confirmationDialogText: e.target.value })}
+          size="small"
+          fullWidth
+          multiline
+          minRows={3}
+          helperText="Shown using window.confirm(...)."
+        />
+
+        <div className="grid grid-cols-2 gap-2">
+          <TextField
+            label="OK Alias"
+            value={okAlias}
+            onChange={(e) => api.updateCustomProps(c.id, { okAlias: e.target.value })}
+            size="small"
+            fullWidth
+            helperText="Note: browser confirm() can't rename buttons. Used as hint text."
+          />
+
+          <TextField
+            label="Cancel Alias"
+            value={cancelAlias}
+            onChange={(e) => api.updateCustomProps(c.id, { cancelAlias: e.target.value })}
+            size="small"
+            fullWidth
+            helperText="Note: browser confirm() can't rename buttons. Used as hint text."
+          />
+        </div>
+      </div>
 
       <div className="flex items-center gap-2 flex-wrap">
         <ButtonGroup>

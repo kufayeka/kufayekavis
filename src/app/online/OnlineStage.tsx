@@ -84,6 +84,7 @@ export function OnlineStage({ engine, state }: { engine: DesignerEngine; state: 
             renderCustom={renderCustom}
             renderNativeByDefinition={renderNativeByDefinition}
             api={host.api}
+            viewMode={Boolean(state.viewMode)}
             runtimePatches={runtimePatches}
           />
         </g>
