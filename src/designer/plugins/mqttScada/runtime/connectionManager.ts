@@ -7,6 +7,17 @@ import { PLUGIN_ID } from "../constants";
 import { coerceSettings, type MqttScadaSettings } from "../settings";
 import { applyRemoteControlCommand } from "./remoteControl";
 
+type MqttScadaRuntimeInfo = {
+  status: "disconnected" | "connecting" | "connected" | "reconnecting" | "offline" | "error";
+  connected: boolean;
+  url?: string;
+  clientId?: string;
+  lastConnectedAt?: number;
+  lastDisconnectedAt?: number;
+  reconnectCount?: number;
+  lastError?: string;
+};
+
 function jsonSafeParse(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -37,6 +48,31 @@ export function createConnectionManager(api: DesignerAPI, registry?: DesignerReg
   let currentOptsJson = "";
   let remoteTopic = "";
 
+  let runtime: MqttScadaRuntimeInfo = {
+    status: "disconnected",
+    connected: false,
+    reconnectCount: 0,
+  };
+
+  const publishRuntime = () => {
+    try {
+      api.engine.setRuntimePluginData(PLUGIN_ID, runtime);
+    } catch {
+      // ignore
+    }
+  };
+
+  const setRuntime = (patch: Partial<MqttScadaRuntimeInfo>) => {
+    runtime = {
+      ...runtime,
+      ...patch,
+    };
+    publishRuntime();
+  };
+
+  // Initialize runtime info for diagnostics UI.
+  publishRuntime();
+
   const disconnect = () => {
     if (!client) return;
     try {
@@ -48,12 +84,19 @@ export function createConnectionManager(api: DesignerAPI, registry?: DesignerReg
     currentUrl = "";
     currentOptsJson = "";
     remoteTopic = "";
+
+    setRuntime({
+      status: "disconnected",
+      connected: false,
+      lastDisconnectedAt: Date.now(),
+    });
   };
 
   const ensureConnected = (settings: MqttScadaSettings) => {
     const url = settings.url?.trim() ?? "";
     if (!url) {
       disconnect();
+      setRuntime({ status: "disconnected", connected: false, url: "" });
       return { client: null as MqttClient | null, status: "disconnected" as const };
     }
 
@@ -65,6 +108,13 @@ export function createConnectionManager(api: DesignerAPI, registry?: DesignerReg
       disconnect();
       currentUrl = url;
       currentOptsJson = nextOptsJson;
+
+      setRuntime({
+        status: "connecting",
+        connected: false,
+        url,
+        clientId: opts.clientId,
+      });
 
       client = mqtt.connect(url, opts);
 
@@ -101,6 +151,15 @@ export function createConnectionManager(api: DesignerAPI, registry?: DesignerReg
       });
 
       client.on("connect", () => {
+        setRuntime({
+          status: "connected",
+          connected: true,
+          url: currentUrl,
+          clientId: (client as unknown as { options?: { clientId?: string } }).options?.clientId ?? opts.clientId,
+          lastConnectedAt: Date.now(),
+          lastError: undefined,
+        });
+
         const s = coerceSettings(api.getPluginSettings(PLUGIN_ID));
         if (s.remoteControlEnabled && s.remoteControlTopic?.trim()) {
           const desired = s.remoteControlTopic.trim();
@@ -116,6 +175,30 @@ export function createConnectionManager(api: DesignerAPI, registry?: DesignerReg
             client?.subscribe(remoteTopic);
           }
         }
+      });
+
+      client.on("reconnect", () => {
+        setRuntime({
+          status: "reconnecting",
+          connected: false,
+          reconnectCount: (runtime.reconnectCount ?? 0) + 1,
+        });
+      });
+
+      client.on("offline", () => {
+        setRuntime({ status: "offline", connected: false, lastDisconnectedAt: Date.now() });
+      });
+
+      client.on("close", () => {
+        setRuntime({ status: "disconnected", connected: false, lastDisconnectedAt: Date.now() });
+      });
+
+      client.on("error", (err) => {
+        setRuntime({
+          status: "error",
+          connected: Boolean(client?.connected),
+          lastError: err?.message ? String(err.message) : "Error",
+        });
       });
     }
 
@@ -163,6 +246,11 @@ export function createConnectionManager(api: DesignerAPI, registry?: DesignerReg
 
   const publishEvent = (settings: MqttScadaSettings, topic: string, data: Record<string, unknown>) => {
     if (!settings.eventOutputEnabled) return;
+
+    const eventType = typeof (data as { eventType?: unknown }).eventType === "string" ? String((data as { eventType?: unknown }).eventType) : "";
+    if (eventType.startsWith("onCanvas") && settings.canvasEventOutputEnabled === false) return;
+    if ((eventType === "onMouseEnter" || eventType === "onClick" || eventType === "onMouseLeave") && settings.elementEventOutputEnabled === false) return;
+
     const c = ensureConnected(settings).client;
     if (!c) return;
 

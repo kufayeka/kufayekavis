@@ -36,6 +36,12 @@ export type BaseElement = {
   enableOnMouseLeaveEventListener?: boolean;
   // MQTT topic for event publishing
   mqttTopic?: string;
+
+  // When true, element events publish to mqttTopic (if non-empty). When false, the element falls back to default/events mapping.
+  mqttTopicEnabled?: boolean;
+
+  // When true, this element ignores the global forcePublishElementEvents setting and only publishes when per-element listener flags are enabled.
+  ignoreGlobalForcePublishElementEvents?: boolean;
 };
 
 export type RectElement = BaseElement & {
@@ -125,6 +131,13 @@ export type TextElement = BaseElement & {
   x: number;
   y: number;
   text: string;
+
+  // Text content source.
+  // - static: render `text`
+  // - mqttClientInfo: render a selected field from the MQTT SCADA client runtime info
+  textSource?: "static" | "mqttClientInfo";
+  mqttInfoKey?: string;
+
   fontSize: number;
   fontWeight: string; // 'normal'|'bold' etc
   fontStyle?: "normal" | "italic";

@@ -130,6 +130,27 @@ export function SettingsDialog({ api }: { api: DesignerAPI }) {
           }
           label="Enable event publish"
         />
+
+        <div className="flex flex-col gap-1">
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={settings.canvasEventOutputEnabled ?? true}
+                onChange={(e) => setSettings((s) => ({ ...s, canvasEventOutputEnabled: e.target.checked }))}
+              />
+            }
+            label="Publish canvas events"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={settings.elementEventOutputEnabled ?? true}
+                onChange={(e) => setSettings((s) => ({ ...s, elementEventOutputEnabled: e.target.checked }))}
+              />
+            }
+            label="Publish element events"
+          />
+        </div>
         <TextField
           label="Default event topic"
           value={settings.defaultEventTopic ?? ""}

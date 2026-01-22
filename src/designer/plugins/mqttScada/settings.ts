@@ -14,6 +14,8 @@ export type MqttScadaSettings = {
 
   // Event output
   eventOutputEnabled?: boolean;
+  canvasEventOutputEnabled?: boolean;
+  elementEventOutputEnabled?: boolean;
   defaultEventTopic?: string; // used when caller publishes to "default/events"
 
   // Force publish UI events even if per-element flags are not enabled.
@@ -35,6 +37,8 @@ export function coerceSettings(value: unknown): MqttScadaSettings {
     remoteControlTopic: typeof v.remoteControlTopic === "string" ? v.remoteControlTopic : "scada/rc",
     remoteControlResponseTopic: typeof v.remoteControlResponseTopic === "string" ? v.remoteControlResponseTopic : "scada/rc/resp",
     eventOutputEnabled: typeof v.eventOutputEnabled === "boolean" ? v.eventOutputEnabled : true,
+    canvasEventOutputEnabled: typeof v.canvasEventOutputEnabled === "boolean" ? v.canvasEventOutputEnabled : true,
+    elementEventOutputEnabled: typeof v.elementEventOutputEnabled === "boolean" ? v.elementEventOutputEnabled : true,
     defaultEventTopic: typeof v.defaultEventTopic === "string" ? v.defaultEventTopic : "scada/events",
 
     forcePublishElementEvents: typeof v.forcePublishElementEvents === "boolean" ? v.forcePublishElementEvents : false,

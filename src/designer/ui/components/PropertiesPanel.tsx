@@ -3,14 +3,14 @@
 import { useSyncExternalStore } from "react";
 import type React from "react";
 import type { DesignerEngine, DesignerState } from "../../core/engine";
-import type { DesignerElement, CustomElement } from "../../core/types";
+import type { DesignerElement } from "../../core/types";
 import { useDesignerHost } from "../hooks/useDesignerHost";
 
 import type { PropertiesSectionRenderCtx } from "./properties/types";
 
 import { Button, ButtonGroup, Checkbox, FormControlLabel, TextField } from "@mui/material";
 
-import { ColorInput, numberInput, Row, textInput } from "./properties/controls";
+import { ColorInput, numberInput, Row } from "./properties/controls";
 
 /* =========================
    Main Panel
@@ -254,15 +254,50 @@ function ElementProperties({
 
       <div className="col-span-2">
         <div className="font-medium mt-2">MQTT Configuration</div>
-        <Row
-          id={`${baseId}-mqtt-topic`}
-          label="MQTT Topic"
-          control={textInput(
-            `${baseId}-mqtt-topic`,
-            el.mqttTopic ?? "",
-            (v) => engine.updateElement(el.id, { mqttTopic: v })
-          )}
-        />
+        {(() => {
+          const rawTopic = (el.mqttTopic ?? "").trim();
+          const effectiveTopicEnabled = el.mqttTopicEnabled === undefined ? Boolean(rawTopic) : Boolean(el.mqttTopicEnabled);
+          return (
+            <>
+              <div className="flex flex-col gap-1 mt-2">
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      id={`${baseId}-mqtt-topic-enabled`}
+                      checked={effectiveTopicEnabled}
+                      onChange={(e) => engine.updateElement(el.id, { mqttTopicEnabled: e.target.checked })}
+                    />
+                  }
+                  label="Use per-element MQTT topic override"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      id={`${baseId}-mqtt-ignore-global-force`}
+                      checked={el.ignoreGlobalForcePublishElementEvents ?? false}
+                      onChange={(e) => engine.updateElement(el.id, { ignoreGlobalForcePublishElementEvents: e.target.checked })}
+                    />
+                  }
+                  label="Ignore global force-publish element events"
+                />
+              </div>
+              <Row
+                id={`${baseId}-mqtt-topic`}
+                label="MQTT Topic"
+                control={
+                  <TextField
+                    id={`${baseId}-mqtt-topic`}
+                    fullWidth
+                    value={el.mqttTopic ?? ""}
+                    onChange={(e) => engine.updateElement(el.id, { mqttTopic: e.target.value })}
+                    placeholder="(empty = use defaultEventTopic)"
+                    disabled={!effectiveTopicEnabled}
+                  />
+                }
+              />
+            </>
+          );
+        })()}
       </div>
     </>
   );

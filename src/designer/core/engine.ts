@@ -42,6 +42,8 @@ export type DesignerState = {
   // Runtime-only overlays (not exported/persisted). Used for online/view mode updates.
   runtime?: {
     elementPatches: Record<ElementId, Partial<DesignerElement>>;
+    // Per-plugin runtime information (not exported/persisted).
+    pluginData?: Record<string, unknown>;
   };
 };
 
@@ -100,7 +102,7 @@ export class DesignerEngine {
       tool: initial?.tool ?? "select",
       clipboard: initial?.clipboard ?? null,
       viewMode: initial?.viewMode ?? false,
-      runtime: initial?.runtime ?? { elementPatches: {} },
+      runtime: initial?.runtime ?? { elementPatches: {}, pluginData: {} },
     };
   }
 
@@ -161,8 +163,34 @@ export class DesignerEngine {
   }
 
   clearRuntimePatches(): void {
-    const nextRuntime = { elementPatches: {} as Record<ElementId, Partial<DesignerElement>> };
+    const nextRuntime = {
+      elementPatches: {} as Record<ElementId, Partial<DesignerElement>>,
+      pluginData: this.state.runtime?.pluginData ?? {},
+    };
     this.setState({ ...this.state, runtime: nextRuntime });
+  }
+
+  getRuntimePluginData(pluginId: string): unknown {
+    const map = this.state.runtime?.pluginData ?? {};
+    return map[pluginId];
+  }
+
+  setRuntimePluginData(pluginId: string, value: unknown): void {
+    const curRuntime = this.state.runtime ?? { elementPatches: {}, pluginData: {} };
+    const curMap = curRuntime.pluginData ?? {};
+    const before = curMap[pluginId];
+    const beforeJson = JSON.stringify(before);
+    const afterJson = JSON.stringify(value);
+    if (beforeJson === afterJson) return;
+
+    const nextMap = { ...curMap, [pluginId]: value };
+    this.setState({
+      ...this.state,
+      runtime: {
+        ...curRuntime,
+        pluginData: nextMap,
+      },
+    });
   }
 
   patchRuntimeElements(ids: ElementId[], patch: Partial<DesignerElement>): void {

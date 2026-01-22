@@ -7,6 +7,7 @@ import type { DesignerHost } from "../../../designer/core/host";
 import type { TextElement } from "../../../designer/core/types";
 import { ColorInput, Row, numberInput, textAreaInput } from "../../../designer/ui/components/properties/controls";
 import { Button, ButtonGroup, MenuItem, TextField } from "@mui/material";
+import { MQTT_CLIENT_INFO_OPTIONS, resolveMqttClientInfoText, getMqttScadaRuntimeFromEngine } from "./mqttClientInfo";
 
 type PropertiesCtx = {
   engine: DesignerEngine;
@@ -16,7 +17,7 @@ type PropertiesCtx = {
 };
 
 export function renderTextProperties(ctxUnknown: unknown): React.ReactNode {
-  const { engine, state } = ctxUnknown as PropertiesCtx;
+  const { engine, state, api } = ctxUnknown as PropertiesCtx;
   const selectedId = state.selection.ids.length === 1 ? state.selection.ids[0] : null;
   const el = selectedId ? state.doc.elements[selectedId] : null;
   if (!el || el.type !== "text") return null;
@@ -24,12 +25,75 @@ export function renderTextProperties(ctxUnknown: unknown): React.ReactNode {
   const t = el as TextElement;
   const baseId = `el-${t.id}`;
 
+  const textSource = (t as unknown as { textSource?: unknown }).textSource === "mqttClientInfo" ? "mqttClientInfo" : "static";
+  const mqttInfoKeyRaw = (t as unknown as { mqttInfoKey?: unknown }).mqttInfoKey;
+  const mqttInfoKey = typeof mqttInfoKeyRaw === "string" ? mqttInfoKeyRaw : "connectionStatus";
+
+  const mqttPreview =
+    textSource === "mqttClientInfo"
+      ? resolveMqttClientInfoText({
+          key: mqttInfoKey,
+          pluginSettings: api.getPluginSettings("system.mqttScada"),
+          pluginRuntime: getMqttScadaRuntimeFromEngine(engine),
+        })
+      : "";
+
   return (
     <div className="grid grid-cols-2 gap-2 items-center">
       <Row id={`${baseId}-x`} label="X" control={numberInput(`${baseId}-x`, t.x, (v) => engine.updateElement(t.id, { x: v }))} />
       <Row id={`${baseId}-y`} label="Y" control={numberInput(`${baseId}-y`, t.y, (v) => engine.updateElement(t.id, { y: v }))} />
+
+      <Row
+        id={`${baseId}-text-source`}
+        label="Content"
+        control={
+          <TextField
+            id={`${baseId}-text-source`}
+            select
+            fullWidth
+            value={textSource}
+            onChange={(e) => {
+              const v = String(e.target.value);
+              if (v === "mqttClientInfo") {
+                engine.updateElement(t.id, { type: "text", textSource: "mqttClientInfo", mqttInfoKey: mqttInfoKey || "connectionStatus" });
+              } else {
+                engine.updateElement(t.id, { type: "text", textSource: "static" });
+              }
+            }}
+          >
+            <MenuItem value="static">Static Text</MenuItem>
+            <MenuItem value="mqttClientInfo">MQTT Client Info</MenuItem>
+          </TextField>
+        }
+      />
+
       <div className="col-span-2">
-        <Row id={`${baseId}-text`} label="Text" control={textAreaInput(`${baseId}-text`, t.text, (v) => engine.updateElement(t.id, { text: v }))} />
+        {textSource === "static" ? (
+          <Row id={`${baseId}-text`} label="Text" control={textAreaInput(`${baseId}-text`, t.text, (v) => engine.updateElement(t.id, { text: v }))} />
+        ) : (
+          <div className="grid grid-cols-2 gap-2 items-center">
+            <Row
+              id={`${baseId}-mqtt-info-key`}
+              label="MQTT Field"
+              control={
+                <TextField
+                  id={`${baseId}-mqtt-info-key`}
+                  select
+                  fullWidth
+                  value={mqttInfoKey}
+                  onChange={(e) => engine.updateElement(t.id, { type: "text", mqttInfoKey: String(e.target.value) })}
+                >
+                  {MQTT_CLIENT_INFO_OPTIONS.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              }
+            />
+            <Row id={`${baseId}-mqtt-preview`} label="Preview" control={<div className="text-xs text-black/70 truncate" title={mqttPreview}>{mqttPreview || "(empty)"}</div>} />
+          </div>
+        )}
       </div>
       <Row
         id={`${baseId}-font-size`}

@@ -105,6 +105,34 @@ const RenderElement = memo(function RenderElement({
 
   const elPatched = applyRuntimePatch(el);
 
+  const shouldIgnoreGlobalForce = Boolean((elPatched as unknown as { ignoreGlobalForcePublishElementEvents?: boolean }).ignoreGlobalForcePublishElementEvents);
+  const effectiveForcePublishElementEvents = forcePublishElementEvents && !shouldIgnoreGlobalForce;
+
+  const resolveEventTopic = (el: DesignerElement): string => {
+    const meta = el as unknown as { mqttTopic?: unknown; mqttTopicEnabled?: unknown };
+    const hasTopic = typeof meta.mqttTopic === "string" && meta.mqttTopic.trim();
+    const enabled = meta.mqttTopicEnabled === undefined ? Boolean(hasTopic) : meta.mqttTopicEnabled === true;
+    const topic = typeof meta.mqttTopic === "string" ? meta.mqttTopic.trim() : "";
+    return enabled && topic ? topic : "default/events";
+  };
+
+  const getOnClickAction = (el: DesignerElement): string | undefined => {
+    if (el.type !== "custom") return undefined;
+    const props = (el.props ?? {}) as Record<string, unknown>;
+    const v = props.onClickAction;
+    return typeof v === "string" && v.trim() ? v : undefined;
+  };
+
+  const publishElementEvent = (el: DesignerElement, eventType: "onMouseEnter" | "onClick" | "onMouseLeave") => {
+    const topic = resolveEventTopic(el);
+    if (eventType === "onClick") {
+      const action = getOnClickAction(el);
+      api.publishEvent(topic, action ? { eventType, sourceElement: el.id, action } : { eventType, sourceElement: el.id });
+      return;
+    }
+    api.publishEvent(topic, { eventType, sourceElement: el.id });
+  };
+
   const getTransform = (cx: number, cy: number) => {
     const parts: string[] = [];
     const meta = elPatched as unknown as { flipH?: boolean; flipV?: boolean };
@@ -123,7 +151,6 @@ const RenderElement = memo(function RenderElement({
       const cy = elPatched.y + elPatched.height / 2;
       return getTransform(cx, cy);
     }
-
     if (elPatched.type === "circle") {
       return getTransform(elPatched.cx, elPatched.cy);
     }
@@ -178,18 +205,18 @@ const RenderElement = memo(function RenderElement({
           transform={getTransformForElement()}
           className="cursor-move"
           onMouseEnter={
-            forcePublishElementEvents || elPatched.enableOnMouseHoverEventListener
-              ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: elPatched.id })
+            effectiveForcePublishElementEvents || elPatched.enableOnMouseHoverEventListener
+              ? () => publishElementEvent(elPatched, "onMouseEnter")
               : undefined
           }
           onClick={
-            forcePublishElementEvents || elPatched.enableOnMouseClickEventListener
-              ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onClick", sourceElement: elPatched.id })
+            effectiveForcePublishElementEvents || elPatched.enableOnMouseClickEventListener
+              ? () => publishElementEvent(elPatched, "onClick")
               : undefined
           }
           onMouseLeave={
-            forcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener
-              ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: elPatched.id })
+            effectiveForcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener
+              ? () => publishElementEvent(elPatched, "onMouseLeave")
               : undefined
           }
         >
@@ -213,18 +240,18 @@ const RenderElement = memo(function RenderElement({
         transform={transform}
         className="cursor-move"
         onMouseEnter={
-          forcePublishElementEvents || elPatched.enableOnMouseHoverEventListener
-            ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onMouseEnter", sourceElement: elPatched.id })
+          effectiveForcePublishElementEvents || elPatched.enableOnMouseHoverEventListener
+            ? () => publishElementEvent(elPatched, "onMouseEnter")
             : undefined
         }
         onClick={
-          forcePublishElementEvents || elPatched.enableOnMouseClickEventListener
-            ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onClick", sourceElement: elPatched.id })
+          effectiveForcePublishElementEvents || elPatched.enableOnMouseClickEventListener
+            ? () => publishElementEvent(elPatched, "onClick")
             : undefined
         }
         onMouseLeave={
-          forcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener
-            ? () => api.publishEvent(elPatched.mqttTopic || "default/events", { eventType: "onMouseLeave", sourceElement: elPatched.id })
+          effectiveForcePublishElementEvents || elPatched.enableOnMouseLeaveEventListener
+            ? () => publishElementEvent(elPatched, "onMouseLeave")
             : undefined
         }
       >

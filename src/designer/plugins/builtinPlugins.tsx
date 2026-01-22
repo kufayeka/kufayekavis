@@ -25,6 +25,8 @@ import { gaugeElementDefinition } from "../../elements/gauge/gauge.definition";
 import { renderGaugeProperties } from "../../elements/gauge/gauge.properties";
 import { barGaugeElementDefinition } from "../../elements/barGauge/barGauge.definition";
 import { renderBarGaugeProperties } from "../../elements/barGauge/barGauge.properties";
+import { buttonElementDefinition } from "../../elements/button/button.definition";
+import { renderButtonProperties } from "../../elements/button/button.properties";
 import { registerBuiltInUiContributions } from "../ui/components/builtins/registerBuiltInUi";
 
 export const builtInUiPlugin: DesignerPlugin = {
@@ -167,6 +169,18 @@ export const barGaugePlugin: DesignerPlugin = {
   },
 };
 
+export const buttonPlugin: DesignerPlugin = {
+  id: "builtin.element.button",
+  activate: (ctx) => {
+    const host = ctx.host;
+    if (!host) return;
+    return [
+      host.elements.register(buttonElementDefinition),
+      host.registry.registerPropertiesSection({ id: "builtin.props.button", render: renderButtonProperties }),
+    ];
+  },
+};
+
 export const builtInElementPlugins: readonly DesignerPlugin[] = [
   ...builtInPalettePlugins,
   numericDisplayPlugin,
@@ -174,4 +188,5 @@ export const builtInElementPlugins: readonly DesignerPlugin[] = [
   motionPathLinePlugin,
   gaugePlugin,
   barGaugePlugin,
+  buttonPlugin,
 ];

@@ -57,6 +57,9 @@ function baseElementSchema(defaults?: { stroke?: string; strokeWidth?: number; f
       enableOnMouseClickEventListener: zBoolOptional(),
       enableOnMouseLeaveEventListener: zBoolOptional(),
       mqttTopic: z.preprocess((v) => (typeof v === "string" ? v : undefined), z.string().optional()),
+
+      mqttTopicEnabled: zBoolOptional(),
+      ignoreGlobalForcePublishElementEvents: zBoolOptional(),
     })
     .loose();
 }

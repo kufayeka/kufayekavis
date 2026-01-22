@@ -179,6 +179,8 @@ export function createText(partial: Partial<TextElement> & { id: string; zIndex:
     x: partial.x ?? 100,
     y: partial.y ?? 100,
     text: partial.text ?? "Text",
+    textSource: partial.textSource ?? "static",
+    mqttInfoKey: partial.mqttInfoKey,
     fontSize: partial.fontSize ?? 20,
     fontWeight: partial.fontWeight ?? "normal",
     fontStyle: partial.fontStyle ?? "normal",
