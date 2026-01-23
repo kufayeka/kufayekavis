@@ -146,23 +146,74 @@ const drawGrid = (
     ctx.restore();
 };
 
-const drawSelection = (
+const drawRotatedSelection = (
     ctx: CanvasRenderingContext2D,
-    bounds: Bounds
+    bounds: Bounds,
+    rotation: number
 ) => {
     ctx.save();
+    const center = getCenter(bounds);
+    ctx.translate(center.x, center.y);
+    ctx.rotate((rotation * Math.PI) / 180);
+
     ctx.strokeStyle = "#60a5fa";
     ctx.setLineDash([6, 6]);
-    ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+    ctx.strokeRect(-bounds.width / 2, -bounds.height / 2, bounds.width, bounds.height);
     ctx.setLineDash([]);
 
     const handles = getHandlePositions(bounds);
     Object.values(handles).forEach((handle) => {
-        ctx.fillStyle = "#0f172a";
+        const localX = handle.x - center.x;
+        const localY = handle.y - center.y;
+        ctx.fillStyle = "#ffffff";
         ctx.strokeStyle = "#60a5fa";
-        ctx.fillRect(handle.x - 4, handle.y - 4, 8, 8);
-        ctx.strokeRect(handle.x - 4, handle.y - 4, 8, 8);
+        ctx.fillRect(localX - 5, localY - 5, 10, 10);
+        ctx.strokeRect(localX - 5, localY - 5, 10, 10);
     });
+
+    const rotateHandleOffset = { x: 0, y: -bounds.height / 2 - 24 };
+    ctx.beginPath();
+    ctx.moveTo(0, -bounds.height / 2);
+    ctx.lineTo(rotateHandleOffset.x, rotateHandleOffset.y);
+    ctx.strokeStyle = "#60a5fa";
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#60a5fa";
+    ctx.beginPath();
+    ctx.arc(rotateHandleOffset.x, rotateHandleOffset.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+};
+
+const drawSelection = (ctx: CanvasRenderingContext2D, bounds: Bounds) => {
+    drawRotatedSelection(ctx, bounds, 0);
+};
+
+const drawLineSelection = (
+    ctx: CanvasRenderingContext2D,
+    element: CanvasElement
+) => {
+    if (element.type !== "line") return;
+    ctx.save();
+    ctx.strokeStyle = "#60a5fa";
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(element.x1, element.y1);
+    ctx.lineTo(element.x2, element.y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const drawHandle = (x: number, y: number) => {
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#60a5fa";
+        ctx.fillRect(x - 5, y - 5, 10, 10);
+        ctx.strokeRect(x - 5, y - 5, 10, 10);
+    };
+
+    drawHandle(element.x1, element.y1);
+    drawHandle(element.x2, element.y2);
     ctx.restore();
 };
 
@@ -187,7 +238,15 @@ export const renderCanvas = (
 
     if (selectedIds.length === 1) {
         const selected = elementsById[selectedIds[0]];
-        if (selected) drawSelection(ctx, getBounds(selected, elementsById));
+        if (selected?.type === "line") {
+            drawLineSelection(ctx, selected);
+        } else if (selected) {
+            drawRotatedSelection(
+                ctx,
+                getBounds(selected, elementsById),
+                selected.rotation ?? 0
+            );
+        }
     } else if (selectedIds.length > 1) {
         const boundsList = selectedIds
             .map((id) => elementsById[id])

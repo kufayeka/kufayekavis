@@ -195,6 +195,37 @@ export default function PropertiesPanel() {
                 </Stack>
 
                 <Stack direction="row" spacing={1}>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => update({ rotation: element.rotation - 45 })}
+                    >
+                        -45°
+                    </Button>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => update({ rotation: element.rotation + 45 })}
+                    >
+                        +45°
+                    </Button>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => update({ rotation: element.rotation - 90 })}
+                    >
+                        -90°
+                    </Button>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => update({ rotation: element.rotation + 90 })}
+                    >
+                        +90°
+                    </Button>
+                </Stack>
+
+                <Stack direction="row" spacing={1}>
                     <TextField
                         label="Stroke"
                         type="color"

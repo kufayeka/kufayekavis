@@ -4,21 +4,24 @@ import type React from "react";
 import clsx from "clsx";
 import { Paper, Typography } from "@mui/material";
 import styles from "../../edit.module.css";
-import { ElementType } from "../../core/models";
+import { ElementType, Tool } from "../../core/models";
+import { useEditor } from "../../state/EditorContext";
 
-const tools: { id: ElementType; label: string }[] = [
+const tools: { id: Tool; label: string; draggable?: boolean }[] = [
+    { id: "select", label: "Select", draggable: false },
     { id: "rect", label: "Rectangle" },
     { id: "circle", label: "Circle" },
     { id: "line", label: "Line" },
     { id: "image", label: "Image" },
     { id: "text", label: "Text" },
-    { id: "freehand", label: "Freehand" },
 ];
 
 export default function ElementPalettePanel() {
+    const { state, dispatch } = useEditor();
     const handleDragStart = (event: React.DragEvent<HTMLDivElement>, type: ElementType) => {
         event.dataTransfer.setData("application/x-kufayeka-element", type);
         event.dataTransfer.effectAllowed = "copy";
+        dispatch({ type: "SET_ACTIVE_TOOL", tool: "select" });
     };
 
     return (
@@ -30,9 +33,18 @@ export default function ElementPalettePanel() {
                 {tools.map((tool) => (
                     <Paper
                         key={tool.id}
-                        className={clsx(styles.paletteCard)}
-                        draggable
-                        onDragStart={(event) => handleDragStart(event, tool.id)}
+                        className={clsx(
+                            styles.paletteCard,
+                            state.activeTool === tool.id && styles.paletteCardActive
+                        )}
+                        draggable={tool.draggable !== false}
+                        onClick={() =>
+                            dispatch({ type: "SET_ACTIVE_TOOL", tool: tool.id })
+                        }
+                        onDragStart={(event) => {
+                            if (tool.draggable === false) return;
+                            handleDragStart(event, tool.id as ElementType);
+                        }}
                     >
                         {tool.label}
                     </Paper>
