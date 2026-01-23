@@ -1,0 +1,246 @@
+.page {
+    height: 100vh;
+    display: flex;
+    background: #f8fafc;
+    color: #0f172a;
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+.shell {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+}
+
+.sidebarLeft {
+    width: 320px;
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+
+.sidebarRight {
+    width: 340px;
+    background: #ffffff;
+    border-left: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+
+.workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.workspaceHeader {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+.canvasArea {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    padding: 24px;
+}
+
+.canvasContainer {
+    position: relative;
+}
+
+.canvas {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+}
+
+.marquee {
+    position: absolute;
+    border: 1px dashed #60a5fa;
+    background: rgba(59, 130, 246, 0.15);
+    pointer-events: none;
+}
+
+.panel {
+    padding: 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.panelTitle {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #2563eb;
+    margin-bottom: 12px;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.rowTight {
+    margin-bottom: 0;
+}
+
+.rowTopSm {
+    margin-top: 8px;
+}
+
+.rowTopMd {
+    margin-top: 12px;
+}
+
+.input {
+    flex: 1;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: #0f172a;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.inputSmall {
+    width: 72px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: #0f172a;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.button {
+    background: #1d4ed8;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.buttonSecondary {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
+}
+
+.buttonDanger {
+    background: #dc2626;
+}
+
+.badge {
+    font-size: 11px;
+    color: #64748b;
+}
+
+.toolGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.toolButton {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #0f172a;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.toolButtonActive {
+    border-color: #60a5fa;
+    background: rgba(37, 99, 235, 0.12);
+}
+
+.paletteCard {
+    border: 1px dashed #cbd5f5;
+    border-radius: 10px;
+    padding: 8px;
+    background: #ffffff;
+    cursor: grab;
+    text-align: center;
+    font-size: 12px;
+}
+
+.paletteCardDragging {
+    opacity: 0.6;
+}
+
+.treeItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.treeIndent0 {
+    padding-left: 8px;
+}
+
+.treeIndent1 {
+    padding-left: 20px;
+}
+
+.treeIndent2 {
+    padding-left: 32px;
+}
+
+.treeIndent3 {
+    padding-left: 44px;
+}
+
+.treeIndent4 {
+    padding-left: 56px;
+}
+
+.treeIndent5 {
+    padding-left: 68px;
+}
+
+.treeItemActive {
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.treeIndent {
+    padding-left: 12px;
+}
+
+.toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.kbd {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+}
